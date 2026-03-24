@@ -14,6 +14,7 @@ export function BottomNav({ homeHref }: { homeHref: string }) {
           <nav className="flex h-14 items-center justify-end text-sm">
             <Link
               href="/logout"
+              prefetch={false}
               className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
               aria-label="Logout"
               title="Logout"
