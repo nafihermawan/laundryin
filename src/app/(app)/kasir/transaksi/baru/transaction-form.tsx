@@ -1,0 +1,723 @@
+"use client";
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import { saveTransaction } from "./actions";
+import { createClient } from "@/lib/supabase/browser";
+
+type Unit = "kg" | "pcs";
+
+type ServiceOption = {
+  id: string;
+  name: string;
+  unit: string;
+  base_price: number;
+};
+
+type ItemRow = {
+  id: string;
+  serviceName: string;
+  unit: Unit;
+  qty: number;
+  price: number;
+};
+
+function toNumber(value: unknown) {
+  const n = typeof value === "number" ? value : Number(String(value ?? ""));
+  return Number.isFinite(n) ? n : 0;
+}
+
+function formatIDR(value: number) {
+  return new Intl.NumberFormat("id-ID", {
+    style: "currency",
+    currency: "IDR",
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
+const paymentOptions = [
+  { value: "cash", label: "Cash" },
+  { value: "transfer", label: "Transfer" },
+  { value: "qris_manual", label: "QRIS Manual" },
+] as const;
+
+export function TransactionForm() {
+  const [mounted, setMounted] = useState(false);
+  const nextItemIdRef = useRef(1);
+  const [dbServices, setDbServices] = useState<ServiceOption[]>([]);
+
+  useEffect(() => {
+    const supabase = createClient();
+    async function fetchServices() {
+      const { data } = await supabase
+        .from("services")
+        .select("*")
+        .eq("is_active", true)
+        .order("name");
+      if (data) setDbServices(data);
+      setMounted(true);
+    }
+    fetchServices();
+  }, []);
+
+  const [customerName, setCustomerName] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
+  const [customerNote, setCustomerNote] = useState("");
+  const [receivedAt, setReceivedAt] = useState(() =>
+    new Date().toISOString().slice(0, 16)
+  );
+  const [dueAt, setDueAt] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 2); // Default 2 hari
+    return d.toISOString().slice(0, 16);
+  });
+  const [paymentMethod, setPaymentMethod] = useState<
+    (typeof paymentOptions)[number]["value"]
+  >("cash");
+  const [cashReceived, setCashReceived] = useState("");
+
+  const [items, setItems] = useState<ItemRow[]>(() => [
+    { id: "0", serviceName: "", unit: "kg", qty: 1, price: 0 },
+  ]);
+
+  const summary = useMemo(() => {
+    const lineTotals = items.map((it) => Math.max(0, it.qty) * Math.max(0, it.price));
+    const total = lineTotals.reduce((a, b) => a + b, 0);
+    const totalQty = items.reduce((a, b) => a + Math.max(0, b.qty), 0);
+    return { lineTotals, total, totalQty, itemCount: items.length };
+  }, [items]);
+
+  const canPreview = useMemo(() => {
+    if (!customerName.trim()) return false;
+    if (items.length === 0) return false;
+    return items.some((it) => it.serviceName.trim() && it.qty > 0);
+  }, [customerName, items]);
+
+  const [showPreview, setShowPreview] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!saveError && !saveSuccess) return;
+    const t = window.setTimeout(() => {
+      setSaveError(null);
+      setSaveSuccess(null);
+    }, 7000);
+    return () => window.clearTimeout(t);
+  }, [saveError, saveSuccess]);
+
+  async function handleSave() {
+    setIsSaving(true);
+    setSaveError(null);
+    setSaveSuccess(null);
+
+    const validItems = items.filter((it) => it.serviceName.trim() && it.qty > 0);
+
+    const result = await saveTransaction({
+      customer: {
+        name: customerName,
+        phone: customerPhone,
+        notes: customerNote,
+      },
+      items: validItems.map((it) => ({
+        serviceName: it.serviceName,
+        unit: it.unit,
+        qty: it.qty,
+        price: it.price,
+      })),
+      status: "diterima",
+      paymentMethod,
+      cashReceived:
+        paymentMethod === "cash" && cashReceived.trim() !== ""
+          ? toNumber(cashReceived)
+          : undefined,
+      receivedAt,
+      dueAt,
+      total: summary.total,
+    });
+
+    if (result.success) {
+      setIsSaving(false);
+      setShowPreview(false);
+      setSaveSuccess(`Transaksi ${result.data.orderNo} berhasil disimpan!`);
+    } else {
+      setSaveError(result.error || "Gagal menyimpan transaksi");
+      setIsSaving(false);
+    }
+  }
+
+  function formatDateDisplay(dateStr: string) {
+    const d = new Date(dateStr);
+    return new Intl.DateTimeFormat("id-ID", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(d);
+  }
+
+  // Jika belum mounted, jangan render konten dinamis untuk menghindari hydration mismatch
+  if (!mounted) {
+    return (
+      <div className="flex h-[400px] items-center justify-center rounded-2xl border border-zinc-200 bg-white shadow-sm">
+        <div className="text-sm text-zinc-500">Memuat form...</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative pb-24 lg:pb-0">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
+        <div className="flex flex-col gap-6">
+        {saveError ? (
+          <div className="flex items-start justify-between gap-3 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-600">
+            <div className="flex-1">{saveError}</div>
+            <button
+              type="button"
+              onClick={() => setSaveError(null)}
+              className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-red-600/80 transition hover:bg-red-500/10 hover:text-red-700"
+              aria-label="Tutup"
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M18 6L6 18"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
+                <path
+                  d="M6 6L18 18"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </button>
+          </div>
+        ) : null}
+
+        {saveSuccess ? (
+          <div className="flex items-start justify-between gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700">
+            <div className="flex-1">{saveSuccess}</div>
+            <button
+              type="button"
+              onClick={() => setSaveSuccess(null)}
+              className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-emerald-700/80 transition hover:bg-emerald-500/10 hover:text-emerald-800"
+              aria-label="Tutup"
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M18 6L6 18"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
+                <path
+                  d="M6 6L18 18"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </button>
+          </div>
+        ) : null}
+
+        <section className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between gap-4">
+              <h2 className="text-base font-semibold tracking-tight">Pelanggan</h2>
+              <div className="text-xs text-zinc-500">
+                Wajib isi nama pelanggan
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="flex flex-col gap-2">
+                <span className="text-sm font-medium text-zinc-700">Nama</span>
+                <input
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  placeholder="Nama pelanggan"
+                  className="h-11 rounded-xl border border-zinc-200 bg-white px-4 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-sky-400/70 focus:ring-4 focus:ring-sky-400/10"
+                  required
+                />
+              </label>
+
+              <label className="flex flex-col gap-2">
+                <span className="text-sm font-medium text-zinc-700">No. HP</span>
+                <input
+                  value={customerPhone}
+                  onChange={(e) => setCustomerPhone(e.target.value)}
+                  inputMode="tel"
+                  placeholder="08xxxxxxxxxx"
+                  className="h-11 rounded-xl border border-zinc-200 bg-white px-4 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-sky-400/70 focus:ring-4 focus:ring-sky-400/10"
+                />
+              </label>
+            </div>
+
+            <label className="flex flex-col gap-2">
+              <span className="text-sm font-medium text-zinc-700">Catatan</span>
+              <textarea
+                value={customerNote}
+                onChange={(e) => setCustomerNote(e.target.value)}
+                placeholder="Catatan tambahan (opsional)"
+                className="min-h-[96px] rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-sky-400/70 focus:ring-4 focus:ring-sky-400/10"
+              />
+            </label>
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+          <div className="flex items-center justify-between gap-4">
+            <h2 className="text-base font-semibold tracking-tight">
+              Item Layanan
+            </h2>
+            <button
+              type="button"
+              onClick={() =>
+                setItems((prev) => {
+                  const id = String(nextItemIdRef.current++);
+                  return [
+                    ...prev,
+                    { id, serviceName: "", unit: "kg", qty: 1, price: 0 },
+                  ];
+                })
+              }
+              className="inline-flex h-9 items-center justify-center rounded-lg border border-zinc-200 bg-white px-3 text-sm font-medium text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
+            >
+              Tambah Item
+            </button>
+          </div>
+
+          <div className="mt-4">
+            <div className="hidden grid-cols-[1fr_80px_100px_130px_44px] gap-3 border-b border-zinc-100 pb-3 text-xs font-medium text-zinc-500 sm:grid">
+                <div>Layanan</div>
+                <div>Satuan</div>
+                <div>Qty</div>
+                <div>Harga</div>
+                <div />
+            </div>
+
+            <div className="flex flex-col gap-4 pt-3">
+              {items.map((it, idx) => {
+                const lineTotal = summary.lineTotals[idx] ?? 0;
+                return (
+                  <div
+                    key={it.id}
+                    className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm sm:rounded-none sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none"
+                  >
+                    <div className="grid gap-3 sm:grid-cols-[1fr_80px_100px_130px_44px] sm:items-start">
+                      <div className="flex flex-col gap-1 sm:contents">
+                        <span className="text-xs font-medium text-zinc-500 sm:hidden">
+                          Layanan
+                        </span>
+                        <select
+                          value={it.serviceName}
+                          onChange={(e) => {
+                            const selectedSvc = dbServices.find(s => s.name === e.target.value);
+                            setItems((prev) =>
+                              prev.map((row) =>
+                                row.id === it.id
+                                  ? { 
+                                      ...row, 
+                                      serviceName: e.target.value,
+                                      unit: (selectedSvc?.unit as Unit) || row.unit,
+                                      price: selectedSvc?.base_price ?? row.price
+                                    }
+                                  : row
+                              )
+                            );
+                          }}
+                          className="h-11 rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none focus:border-sky-400/70 focus:ring-4 focus:ring-sky-400/10"
+                        >
+                          <option value="" disabled>
+                            Pilih layanan
+                          </option>
+                          {dbServices.length > 0 ? (
+                            dbServices.map((svc) => (
+                              <option key={svc.id} value={svc.name}>
+                                {svc.name}
+                              </option>
+                            ))
+                          ) : (
+                            <>
+                              <option value="cuci + setrika">Cuci + Setrika</option>
+                              <option value="cuci kering saja">Cuci Kering Saja</option>
+                              <option value="setrika saja">Setrika Saja</option>
+                              <option value="bed cover">Bed Cover</option>
+                            </>
+                          )}
+                        </select>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3 sm:contents">
+                        <div className="flex flex-col gap-1 sm:contents">
+                          <span className="text-xs font-medium text-zinc-500 sm:hidden">
+                            Satuan
+                          </span>
+                          <select
+                            value={it.unit}
+                            disabled
+                            className="h-11 rounded-xl border border-zinc-200 bg-zinc-50 px-3 text-sm text-zinc-500 outline-none appearance-none"
+                          >
+                            <option value="kg">Kg</option>
+                            <option value="pcs">Pcs</option>
+                          </select>
+                        </div>
+
+                        <div className="flex flex-col gap-1 sm:contents">
+                          <span className="text-xs font-medium text-zinc-500 sm:hidden">
+                            Qty
+                          </span>
+                          <div className="flex flex-col gap-1">
+                            <input
+                              value={String(it.qty)}
+                              onChange={(e) =>
+                                setItems((prev) =>
+                                  prev.map((row) =>
+                                    row.id === it.id
+                                      ? { ...row, qty: toNumber(e.target.value) }
+                                      : row
+                                  )
+                                )
+                              }
+                              inputMode="decimal"
+                              className="h-11 rounded-xl border border-zinc-200 bg-white px-4 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-sky-400/70 focus:ring-4 focus:ring-sky-400/10"
+                            />
+                            <div className="text-xs text-zinc-500">
+                              Subtotal: {formatIDR(lineTotal)}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col gap-1 sm:contents">
+                        <span className="text-xs font-medium text-zinc-500 sm:hidden">
+                          Harga
+                        </span>
+                        <input
+                          value={String(it.price)}
+                          readOnly
+                          tabIndex={-1}
+                          inputMode="numeric"
+                          placeholder="0"
+                          className="h-11 rounded-xl border border-zinc-200 bg-zinc-50 px-4 text-sm text-zinc-500 outline-none"
+                        />
+                      </div>
+
+                      <div className="flex items-end justify-end sm:items-center sm:justify-center">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setItems((prev) =>
+                              prev.length <= 1
+                                ? prev
+                                : prev.filter((row) => row.id !== it.id)
+                            )
+                          }
+                          className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-zinc-200 text-zinc-600 transition hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
+                          aria-label="Hapus item"
+                          title="Hapus"
+                          disabled={items.length <= 1}
+                        >
+                          <svg
+                            width="18"
+                            height="18"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            xmlns="http://www.w3.org/2000/svg"
+                          >
+                            <path
+                              d="M6 7H18"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                            />
+                            <path
+                              d="M10 11V17"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                            />
+                            <path
+                              d="M14 11V17"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                            />
+                            <path
+                              d="M9 7L10 5H14L15 7"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                            <path
+                              d="M7 7L8 20H16L17 7"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <aside className="flex flex-col gap-6">
+        <section className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+          <h2 className="text-base font-semibold tracking-tight">Ringkasan</h2>
+
+          <div className="mt-4 flex flex-col gap-3 text-sm">
+            <div className="flex flex-col gap-2">
+              <span className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Layanan Terpilih</span>
+              <div className="flex flex-col gap-1.5">
+                {items.filter(it => it.serviceName.trim()).length > 0 ? (
+                  items.filter(it => it.serviceName.trim()).map((it) => (
+                    <div key={it.id} className="flex items-center justify-between gap-2">
+                      <span className="text-zinc-700 truncate">{it.serviceName}</span>
+                      <span className="font-medium text-zinc-900 shrink-0">{it.qty} {it.unit}</span>
+                    </div>
+                  ))
+                ) : (
+                  <span className="text-zinc-400 italic text-xs">Belum ada layanan</span>
+                )}
+              </div>
+            </div>
+            
+            <div className="flex items-center justify-between gap-4 border-t border-zinc-100 pt-3">
+              <span className="text-zinc-600 font-medium">Total</span>
+              <span className="text-base font-semibold tracking-tight text-sky-600">
+                {formatIDR(summary.total)}
+              </span>
+            </div>
+          </div>
+
+          <div className="mt-5 grid gap-4">
+            <div className="grid grid-cols-2 gap-4">
+              <label className="flex flex-col gap-2">
+                <span className="text-sm font-medium text-zinc-700">
+                  Tanggal Masuk
+                </span>
+                <input
+                  type="datetime-local"
+                  value={receivedAt}
+                  onChange={(e) => setReceivedAt(e.target.value)}
+                  className="h-11 rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none focus:border-sky-400/70 focus:ring-4 focus:ring-sky-400/10"
+                />
+              </label>
+
+              <label className="flex flex-col gap-2">
+                <span className="text-sm font-medium text-zinc-700">
+                  Estimasi Selesai
+                </span>
+                <input
+                  type="datetime-local"
+                  value={dueAt}
+                  onChange={(e) => setDueAt(e.target.value)}
+                  className="h-11 rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none focus:border-sky-400/70 focus:ring-4 focus:ring-sky-400/10"
+                />
+              </label>
+            </div>
+
+            <label className="flex flex-col gap-2">
+              <span className="text-sm font-medium text-zinc-700">
+                Pembayaran
+              </span>
+              <select
+                value={paymentMethod}
+                onChange={(e) => {
+                  const next = e.target.value as (typeof paymentOptions)[number]["value"];
+                  setPaymentMethod(next);
+                  if (next === "cash" && cashReceived.trim() === "") {
+                    setCashReceived(String(summary.total));
+                  }
+                }}
+                className="h-11 rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none focus:border-sky-400/70 focus:ring-4 focus:ring-sky-400/10"
+              >
+                {paymentOptions.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            {paymentMethod === "cash" ? (
+              <label className="flex flex-col gap-2">
+                <span className="text-sm font-medium text-zinc-700">
+                  Uang Diterima
+                </span>
+                <input
+                  type="number"
+                  value={cashReceived}
+                  onChange={(e) => setCashReceived(e.target.value)}
+                  inputMode="numeric"
+                  placeholder={String(summary.total)}
+                  className="h-11 rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none focus:border-sky-400/70 focus:ring-4 focus:ring-sky-400/10"
+                />
+                <span className="text-xs text-zinc-500">
+                  Kembalian: {formatIDR(toNumber(cashReceived) - summary.total)}
+                </span>
+              </label>
+            ) : null}
+          </div>
+
+          <div className="mt-6 flex flex-col gap-3">
+            <button
+              type="button"
+              disabled={!canPreview || isSaving}
+              onClick={() => setShowPreview(true)}
+              className="inline-flex h-11 items-center justify-center rounded-xl bg-zinc-900 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-200 disabled:text-zinc-500"
+            >
+              Preview Nota
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setCustomerName("");
+                setCustomerPhone("");
+                setCustomerNote("");
+                setCashReceived("0");
+                setReceivedAt(new Date().toISOString().slice(0, 16));
+                const d = new Date();
+                d.setDate(d.getDate() + 2);
+                setDueAt(d.toISOString().slice(0, 16));
+                setPaymentMethod("cash");
+                nextItemIdRef.current = 1;
+                setItems([{ id: "0", serviceName: "", unit: "kg", qty: 1, price: 0 }]);
+                setShowPreview(false);
+              }}
+              className="inline-flex h-11 items-center justify-center rounded-xl border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
+            >
+              Reset
+            </button>
+          </div>
+        </section>
+
+        {showPreview ? (
+          <section className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-base font-semibold tracking-tight">
+                Preview Nota
+              </h2>
+              <button
+                type="button"
+                onClick={() => setShowPreview(false)}
+                className="inline-flex h-8 items-center justify-center rounded-lg border border-zinc-200 bg-white px-2 text-xs font-medium text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
+              >
+                Tutup
+              </button>
+            </div>
+
+            <div className="mt-4 flex flex-col gap-3 text-sm">
+              <div className="flex flex-col gap-1">
+                <span className="text-xs font-medium text-zinc-500">Pelanggan</span>
+                <span className="font-medium">{customerName || "-"}</span>
+                <span className="text-zinc-600">{customerPhone || "-"}</span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs font-medium text-zinc-500">Masuk</span>
+                  <span className="text-xs font-medium">{formatDateDisplay(receivedAt)}</span>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs font-medium text-zinc-500">Estimasi</span>
+                  <span className="text-xs font-medium text-amber-600">{formatDateDisplay(dueAt)}</span>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <span className="text-xs font-medium text-zinc-500">Pembayaran</span>
+                <span className="font-medium">
+                  {paymentOptions.find((p) => p.value === paymentMethod)?.label ??
+                    paymentMethod}
+                </span>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <span className="text-xs font-medium text-zinc-500">Item</span>
+                <div className="flex flex-col gap-2">
+                  {items
+                    .filter((it) => it.serviceName.trim() && it.qty > 0)
+                    .map((it) => (
+                      <div
+                        key={it.id}
+                        className="flex items-start justify-between gap-4 rounded-xl border border-zinc-100 bg-zinc-50 px-3 py-2"
+                      >
+                        <div className="flex flex-col">
+                          <span className="font-medium">{it.serviceName}</span>
+                          <span className="text-xs text-zinc-600">
+                            {it.qty} {it.unit} × {formatIDR(Math.max(0, it.price))}
+                          </span>
+                        </div>
+                        <span className="font-semibold">
+                          {formatIDR(Math.max(0, it.qty) * Math.max(0, it.price))}
+                        </span>
+                      </div>
+                    ))}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between gap-4 border-t border-zinc-100 pt-3">
+                <span className="text-zinc-600">Total</span>
+                <span className="text-base font-semibold tracking-tight">
+                  {formatIDR(summary.total)}
+                </span>
+              </div>
+
+              {customerNote.trim() ? (
+                <div className="rounded-xl border border-zinc-100 bg-zinc-50 px-3 py-2 text-xs text-zinc-700">
+                  {customerNote}
+                </div>
+              ) : null}
+
+              <button
+                type="button"
+                disabled={isSaving}
+                onClick={handleSave}
+                className="mt-4 inline-flex h-11 items-center justify-center rounded-xl bg-sky-500 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:bg-zinc-200 disabled:text-zinc-500"
+              >
+                {isSaving ? "Menyimpan..." : "Simpan Transaksi"}
+              </button>
+            </div>
+          </section>
+        ) : null}
+      </aside>
+      </div>
+
+      <div className="fixed inset-x-0 bottom-14 z-30 lg:hidden">
+        <div className="mx-auto w-full max-w-6xl px-4 pb-2">
+          <div className="flex items-center justify-between rounded-2xl border border-zinc-200 bg-white/95 px-4 py-3 shadow-sm backdrop-blur">
+            <div className="flex flex-col">
+              <div className="text-xs font-medium text-zinc-500">Total</div>
+              <div className="text-base font-semibold tracking-tight text-sky-600">
+                {formatIDR(summary.total)}
+              </div>
+            </div>
+            <div className="text-xs text-zinc-500">{summary.itemCount} item</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
