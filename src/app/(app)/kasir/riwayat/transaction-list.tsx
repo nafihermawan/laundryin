@@ -66,7 +66,7 @@ export function TransactionList({ initialTransactions }: { initialTransactions: 
       if (record.type === "embed:height") {
         const h = record.height;
         if (typeof h !== "number" || !Number.isFinite(h) || h <= 0) return;
-        const next = Math.min(Math.max(Math.round(h), 240), 900);
+        const next = Math.min(Math.max(Math.round(h), 240), 2000);
         const source = event.source as Window | null;
         if (filterFrameRef.current?.contentWindow && source === filterFrameRef.current.contentWindow) {
           setFilterHeight(next);
@@ -122,7 +122,7 @@ export function TransactionList({ initialTransactions }: { initialTransactions: 
         doc.body;
       const h = Math.ceil(root.getBoundingClientRect().height);
       if (!Number.isFinite(h) || h <= 0) return;
-      setDetailHeight(Math.min(Math.max(Math.round(h), 300), 900));
+      setDetailHeight(Math.min(Math.max(Math.round(h), 300), 2000));
     } catch {}
   }, []);
 
@@ -138,7 +138,7 @@ export function TransactionList({ initialTransactions }: { initialTransactions: 
         doc.body;
       const h = Math.ceil(root.getBoundingClientRect().height);
       if (!Number.isFinite(h) || h <= 0) return;
-      setFilterHeight(Math.min(Math.max(Math.round(h), 240), 900));
+      setFilterHeight(Math.min(Math.max(Math.round(h), 240), 2000));
     } catch {}
   }, []);
 
@@ -351,24 +351,28 @@ export function TransactionList({ initialTransactions }: { initialTransactions: 
             }
           }}
         >
-          <iframe
-            src={`/embed/riwayat-filter?status=${encodeURIComponent(filterStatus)}&from=${encodeURIComponent(dateFrom)}&to=${encodeURIComponent(dateTo)}`}
-            className="w-full max-w-md rounded-2xl bg-transparent shadow-xl"
+          <div
+            className="w-full max-w-md overflow-auto rounded-2xl shadow-xl"
             style={{
-              height: filterHeight
-                ? `${Math.min(filterHeight, maxModalHeight ?? filterHeight)}px`
-                : "min(360px, 85vh)",
+              maxHeight: maxModalHeight ? `${maxModalHeight}px` : "85vh",
+              WebkitOverflowScrolling: "touch",
             }}
-            frameBorder={0}
-            scrolling="yes"
-            ref={filterFrameRef}
-            onLoad={() => {
-              updateFilterHeightFromFrame();
-              window.setTimeout(updateFilterHeightFromFrame, 50);
-              window.setTimeout(updateFilterHeightFromFrame, 200);
-              window.setTimeout(updateFilterHeightFromFrame, 500);
-            }}
-          />
+          >
+            <iframe
+              src={`/embed/riwayat-filter?status=${encodeURIComponent(filterStatus)}&from=${encodeURIComponent(dateFrom)}&to=${encodeURIComponent(dateTo)}`}
+              className="w-full rounded-2xl bg-transparent"
+              style={{ height: filterHeight ? `${filterHeight}px` : "360px" }}
+              frameBorder={0}
+              scrolling="no"
+              ref={filterFrameRef}
+              onLoad={() => {
+                updateFilterHeightFromFrame();
+                window.setTimeout(updateFilterHeightFromFrame, 50);
+                window.setTimeout(updateFilterHeightFromFrame, 200);
+                window.setTimeout(updateFilterHeightFromFrame, 500);
+              }}
+            />
+          </div>
         </div>
       ) : null}
 
@@ -383,24 +387,28 @@ export function TransactionList({ initialTransactions }: { initialTransactions: 
           }}
         >
           {detailOrder.id ? (
-            <iframe
-              src={`/embed/riwayat-detail/${detailOrder.id}`}
-              className="w-full max-w-2xl rounded-2xl bg-transparent shadow-xl"
+            <div
+              className="w-full max-w-2xl overflow-auto rounded-2xl shadow-xl"
               style={{
-                height: detailHeight
-                  ? `${Math.min(detailHeight, maxModalHeight ?? detailHeight)}px`
-                  : "min(720px, 85vh)",
+                maxHeight: maxModalHeight ? `${maxModalHeight}px` : "85vh",
+                WebkitOverflowScrolling: "touch",
               }}
-              frameBorder={0}
-              scrolling="yes"
-              ref={detailFrameRef}
-              onLoad={() => {
-                updateDetailHeightFromFrame();
-                window.setTimeout(updateDetailHeightFromFrame, 50);
-                window.setTimeout(updateDetailHeightFromFrame, 200);
-                window.setTimeout(updateDetailHeightFromFrame, 500);
-              }}
-            />
+            >
+              <iframe
+                src={`/embed/riwayat-detail/${detailOrder.id}`}
+                className="w-full rounded-2xl bg-transparent"
+                style={{ height: detailHeight ? `${detailHeight}px` : "720px" }}
+                frameBorder={0}
+                scrolling="no"
+                ref={detailFrameRef}
+                onLoad={() => {
+                  updateDetailHeightFromFrame();
+                  window.setTimeout(updateDetailHeightFromFrame, 50);
+                  window.setTimeout(updateDetailHeightFromFrame, 200);
+                  window.setTimeout(updateDetailHeightFromFrame, 500);
+                }}
+              />
+            </div>
           ) : (
             <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-4 text-sm text-zinc-700 shadow-sm">
               Detail tidak tersedia untuk transaksi ini.
