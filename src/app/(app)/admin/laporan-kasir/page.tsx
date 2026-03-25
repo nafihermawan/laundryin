@@ -1,5 +1,17 @@
 import { createClient } from "@/lib/supabase/server";
 
+type CashRegisterRow = {
+  id: string;
+  opened_at: string;
+  closed_at: string | null;
+  starting_cash: number;
+  expected_cash: number | null;
+  actual_cash: number | null;
+  variance: number | null;
+  status: "open" | "closed" | string;
+  profiles?: { full_name?: string | null } | null;
+};
+
 function formatIDR(amount: number) {
   return new Intl.NumberFormat("id-ID", {
     style: "currency",
@@ -16,8 +28,8 @@ export const metadata = {
 export default async function LaporanKasirPage() {
   const supabase = await createClient();
 
-  const { data: registers, error } = await supabase
-    .from("cash_registers" as any)
+  const { data, error } = await supabase
+    .from("cash_registers")
     .select(`
       *,
       user:user_id (
@@ -28,6 +40,8 @@ export default async function LaporanKasirPage() {
       )
     `)
     .order("opened_at", { ascending: false });
+
+  const registers = (data ?? []) as unknown as CashRegisterRow[];
 
   if (error) {
     return (
@@ -73,10 +87,10 @@ export default async function LaporanKasirPage() {
                 </td>
               </tr>
             ) : (
-              registers?.map((reg: any) => (
+              registers?.map((reg) => (
                 <tr key={reg.id} className="transition-colors hover:bg-zinc-50/50">
                   <td className="px-4 py-3 font-medium text-zinc-900">
-                    {reg.profiles?.full_name || "Tanpa Nama"}
+                    {(reg.profiles as { full_name?: string })?.full_name || "Tanpa Nama"}
                   </td>
                   <td className="px-4 py-3">
                     {new Date(reg.opened_at).toLocaleString("id-ID")}

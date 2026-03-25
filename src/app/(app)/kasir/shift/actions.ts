@@ -15,7 +15,7 @@ export async function openShift(startingCash: number): Promise<ActionResponse> {
 
   // Cek apakah sudah ada shift open
   const { data: existing } = await supabase
-    .from("cash_registers" as any)
+    .from("cash_registers")
     .select("id")
     .eq("user_id", user.id)
     .eq("status", "open")
@@ -25,7 +25,7 @@ export async function openShift(startingCash: number): Promise<ActionResponse> {
     return actionError("Anda sudah memiliki shift kasir yang aktif");
   }
 
-  const { error } = await supabase.from("cash_registers" as any).insert({
+  const { error } = await supabase.from("cash_registers").insert({
     user_id: user.id,
     starting_cash: startingCash,
     status: "open",
@@ -48,7 +48,7 @@ export async function closeShift(registerId: string, actualCash: number, notes?:
 
   // 1. Ambil data register open
   const { data: register, error: regError } = await supabase
-    .from("cash_registers" as any)
+    .from("cash_registers")
     .select("*")
     .eq("id", registerId)
     .eq("user_id", user.id)
@@ -69,14 +69,14 @@ export async function closeShift(registerId: string, actualCash: number, notes?:
 
   if (payError) return actionError(payError.message);
 
-  const regData = register as any;
+  const starting = register?.starting_cash ?? 0;
   const totalCashPayments = (payments ?? []).reduce((sum, p) => sum + Number(p.amount), 0);
-  const expectedCash = Number(regData.starting_cash) + totalCashPayments;
+  const expectedCash = Number(starting) + totalCashPayments;
   const variance = actualCash - expectedCash;
 
   // 3. Update register
   const { error: updateError } = await supabase
-    .from("cash_registers" as any)
+    .from("cash_registers")
     .update({
       closed_at: new Date().toISOString(),
       expected_cash: expectedCash,

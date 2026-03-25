@@ -9,6 +9,60 @@ export type Json =
 export interface Database {
   public: {
     Tables: {
+      cash_registers: {
+        Row: {
+          id: string;
+          user_id: string;
+          opened_at: string;
+          closed_at: string | null;
+          starting_cash: number;
+          expected_cash: number | null;
+          actual_cash: number | null;
+          variance: number | null;
+          notes: string | null;
+          status: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          opened_at?: string;
+          closed_at?: string | null;
+          starting_cash?: number;
+          expected_cash?: number | null;
+          actual_cash?: number | null;
+          variance?: number | null;
+          notes?: string | null;
+          status?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          opened_at?: string;
+          closed_at?: string | null;
+          starting_cash?: number;
+          expected_cash?: number | null;
+          actual_cash?: number | null;
+          variance?: number | null;
+          notes?: string | null;
+          status?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "cash_registers_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "cash_registers_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
       customers: {
         Row: {
           address: string | null;

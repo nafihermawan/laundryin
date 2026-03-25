@@ -103,13 +103,6 @@ export function TransactionForm() {
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
 
   useEffect(() => {
-    if (paymentMethod !== "cash") return;
-    if (cashReceived.trim() !== "") return;
-    if (summary.total <= 0) return;
-    setCashReceived(String(summary.total));
-  }, [cashReceived, paymentMethod, summary.total]);
-
-  useEffect(() => {
     if (!saveError && !saveSuccess) return;
     const t = window.setTimeout(() => {
       setSaveError(null);
@@ -117,6 +110,20 @@ export function TransactionForm() {
     }, 7000);
     return () => window.clearTimeout(t);
   }, [saveError, saveSuccess]);
+
+  function resetFormInputs() {
+    setCustomerName("");
+    setCustomerPhone("");
+    setCustomerNote("");
+    setCashReceived("");
+    setReceivedAt(new Date().toISOString().slice(0, 16));
+    const d = new Date();
+    d.setDate(d.getDate() + 2);
+    setDueAt(d.toISOString().slice(0, 16));
+    setPaymentMethod("cash");
+    nextItemIdRef.current = 1;
+    setItems([{ id: "0", serviceName: "", unit: "kg", qty: 1, price: 0 }]);
+  }
 
   async function handleSave() {
     if (!customerName.trim()) {
@@ -171,19 +178,12 @@ export function TransactionForm() {
 
     if (result.success) {
       setIsSaving(false);
+      resetFormInputs();
       setSaveSuccess(`Transaksi ${result.data.orderNo} berhasil disimpan!`);
     } else {
       setSaveError(result.error || "Gagal menyimpan transaksi");
       setIsSaving(false);
     }
-  }
-
-  function formatDateDisplay(dateStr: string) {
-    const d = new Date(dateStr);
-    return new Intl.DateTimeFormat("id-ID", {
-      dateStyle: "medium",
-      timeStyle: "short",
-    }).format(d);
   }
 
   // Jika belum mounted, jangan render konten dinamis untuk menghindari hydration mismatch
@@ -625,17 +625,7 @@ export function TransactionForm() {
             <button
               type="button"
               onClick={() => {
-                setCustomerName("");
-                setCustomerPhone("");
-                setCustomerNote("");
-                setCashReceived("");
-                setReceivedAt(new Date().toISOString().slice(0, 16));
-                const d = new Date();
-                d.setDate(d.getDate() + 2);
-                setDueAt(d.toISOString().slice(0, 16));
-                setPaymentMethod("cash");
-                nextItemIdRef.current = 1;
-                setItems([{ id: "0", serviceName: "", unit: "kg", qty: 1, price: 0 }]);
+                resetFormInputs();
               }}
               className="inline-flex h-11 items-center justify-center rounded-xl border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
             >

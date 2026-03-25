@@ -39,13 +39,15 @@ export async function saveTransaction(data: TransactionData): Promise<ActionResp
 
   // 1b. Cek apakah kasir sudah buka shift
   const { data: shift } = await supabase
-    .from("cash_registers" as any)
+    .from("cash_registers")
     .select("id")
     .eq("user_id", user.id)
     .eq("status", "open")
     .maybeSingle();
 
-  if (!shift) {
+  const shiftId = (shift as unknown as { id?: string } | null)?.id ?? null;
+
+  if (!shiftId) {
     return actionError("Anda harus membuka shift kasir terlebih dahulu sebelum membuat transaksi");
   }
 
@@ -168,7 +170,12 @@ export async function saveTransaction(data: TransactionData): Promise<ActionResp
       return actionError(itemsError.message || "Gagal menyimpan item transaksi");
     }
 
-    const shiftData = shift as any;
+    const shiftData = shift;
+    if (!shiftData) {
+      await supabase.from("orders").delete().eq("id", createdOrderId);
+      return actionError("Shift kasir tidak valid");
+    }
+
     // 6. Insert Payment
     const cashReceived =
       data.paymentMethod === "cash" && typeof data.cashReceived === "number"

@@ -39,13 +39,15 @@ export async function payOrder(orderId: string, input: PayOrderInput): Promise<A
 
   // Cek apakah kasir sudah buka shift
   const { data: shift } = await supabase
-    .from("cash_registers" as any)
+    .from("cash_registers")
     .select("id")
     .eq("user_id", user.id)
     .eq("status", "open")
     .maybeSingle();
 
-  if (!shift) {
+  const shiftId = (shift as unknown as { id?: string } | null)?.id ?? null;
+
+  if (!shiftId) {
     return actionError("Anda harus membuka shift kasir terlebih dahulu sebelum menerima pembayaran");
   }
   const role = await getUserRole(supabase, user.id);
@@ -114,7 +116,9 @@ export async function payOrder(orderId: string, input: PayOrderInput): Promise<A
 
   if (pendingPaymentError) return actionError(pendingPaymentError.message);
 
-  const shiftData = shift as any;
+  const shiftData = shift;
+  if (!shiftData) return actionError("Shift kasir tidak valid");
+
   if (pendingPayment?.id) {
     const { error: updateError } = await supabase
       .from("payments")

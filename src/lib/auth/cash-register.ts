@@ -12,7 +12,7 @@ export async function getActiveCashRegister(
   userId: string
 ): Promise<CashRegisterStatus> {
   const { data, error } = await supabase
-    .from("cash_registers" as any)
+    .from("cash_registers")
     .select("id, opened_at, starting_cash")
     .eq("user_id", userId)
     .eq("status", "open")
@@ -24,10 +24,16 @@ export async function getActiveCashRegister(
     return { isOpen: false };
   }
 
+  const row = data as unknown as {
+    id: string;
+    opened_at: string;
+    starting_cash: number;
+  };
+
   return {
     isOpen: true,
-    registerId: data.id,
-    openedAt: data.opened_at,
-    startingCash: data.starting_cash,
+    registerId: row.id,
+    openedAt: row.opened_at,
+    startingCash: row.starting_cash,
   };
 }
