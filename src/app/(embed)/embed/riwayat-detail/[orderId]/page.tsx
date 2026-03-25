@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 
 import { HeightSender } from "../../height-sender";
 import { TransactionActions } from "@/app/(app)/kasir/riwayat/[orderId]/transaction-actions";
+import { PrintNotaButton } from "./print-nota-button";
 
 function formatIDR(value: number) {
   return new Intl.NumberFormat("id-ID", {
@@ -104,14 +105,7 @@ export default async function RiwayatDetailEmbedPage({
             <div className="text-sm font-semibold text-zinc-900">Detail Transaksi</div>
             <div className="text-xs text-zinc-500">{order.order_no}</div>
           </div>
-          <a
-            href={`/kasir/nota/${order.id}`}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex h-10 items-center justify-center rounded-xl bg-zinc-900 px-3 text-sm font-semibold text-white transition hover:bg-zinc-800"
-          >
-            Nota
-          </a>
+          <PrintNotaButton orderId={order.id} />
         </div>
 
         <div className="grid gap-4 p-5 lg:grid-cols-3">
