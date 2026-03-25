@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { success as actionSuccess, error as actionError, type ActionResponse } from "@/lib/action-response";
+import { getUserRole } from "@/lib/auth/get-user-role";
 
 export type TransactionData = {
   customer: {
@@ -36,9 +37,60 @@ export async function saveTransaction(data: TransactionData): Promise<ActionResp
     return actionError("User tidak terautentikasi");
   }
 
+  // 1b. Cek apakah kasir sudah buka shift
+  const { data: shift } = await supabase
+    .from("cash_registers" as any)
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("status", "open")
+    .maybeSingle();
+
+  if (!shift) {
+    return actionError("Anda harus membuka shift kasir terlebih dahulu sebelum membuat transaksi");
+  }
+
   let orderId: string | null = null;
 
   try {
+    const role = await getUserRole(supabase, user.id);
+    const computedTotal = (data.items ?? []).reduce((sum, it) => {
+      const qty = Number(it.qty ?? 0);
+      const price = Number(it.price ?? 0);
+      if (!Number.isFinite(qty) || !Number.isFinite(price)) return sum;
+      return sum + Math.max(0, qty) * Math.max(0, price);
+    }, 0);
+
+    if (data.items.length === 0 || computedTotal < 0) {
+      return actionError("Item transaksi tidak valid");
+    }
+
+    const receivedAtTs = new Date(data.receivedAt);
+    const dueAtTs = new Date(data.dueAt);
+    if (!Number.isFinite(receivedAtTs.getTime())) return actionError("Tanggal masuk tidak valid");
+    if (!Number.isFinite(dueAtTs.getTime())) return actionError("Tanggal estimasi tidak valid");
+    if (dueAtTs.getTime() < receivedAtTs.getTime()) {
+      return actionError("Estimasi tidak boleh sebelum tanggal masuk");
+    }
+
+    if (role !== "admin") {
+      const now = Date.now();
+      const received = receivedAtTs.getTime();
+      const maxBackMs = 2 * 60 * 60 * 1000;
+      const maxFutureMs = 5 * 60 * 1000;
+      if (received < now - maxBackMs) {
+        return actionError("Tanggal masuk terlalu mundur (maksimal 2 jam)");
+      }
+      if (received > now + maxFutureMs) {
+        return actionError("Tanggal masuk terlalu maju");
+      }
+    }
+
+    if (data.paymentMethod === "cash") {
+      if (typeof data.cashReceived !== "number" || data.cashReceived < computedTotal) {
+        return actionError("Uang diterima tidak mencukupi total tagihan");
+      }
+    }
+
     // 2. Cari atau buat customer
     let customerId: string;
     
@@ -116,12 +168,13 @@ export async function saveTransaction(data: TransactionData): Promise<ActionResp
       return actionError(itemsError.message || "Gagal menyimpan item transaksi");
     }
 
+    const shiftData = shift as any;
     // 6. Insert Payment
     const cashReceived =
       data.paymentMethod === "cash" && typeof data.cashReceived === "number"
         ? data.cashReceived
         : null;
-    const change = cashReceived !== null ? cashReceived - data.total : null;
+    const change = cashReceived !== null ? cashReceived - computedTotal : null;
     const paymentNotes =
       data.paymentMethod === "cash" && (cashReceived !== null || change !== null)
         ? [cashReceived !== null ? `cash_received=${cashReceived}` : null, change !== null ? `change=${change}` : null]
@@ -133,8 +186,9 @@ export async function saveTransaction(data: TransactionData): Promise<ActionResp
       .from("payments")
       .insert({
         order_id: createdOrderId,
+        cash_register_id: shiftData.id,
         paid_at: data.paymentMethod === "cash" ? new Date().toISOString() : null,
-        amount: data.total,
+        amount: computedTotal,
         method: data.paymentMethod,
         status: data.paymentMethod === "cash" ? "paid" : "pending",
         received_by: user.id,

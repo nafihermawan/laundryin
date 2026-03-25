@@ -86,16 +86,28 @@ export function TransactionForm() {
     return { lineTotals, total, totalQty, itemCount: items.length };
   }, [items]);
 
-  const canPreview = useMemo(() => {
+  const canSubmit = useMemo(() => {
     if (!customerName.trim()) return false;
     if (items.length === 0) return false;
-    return items.some((it) => it.serviceName.trim() && it.qty > 0);
-  }, [customerName, items]);
+    if (!items.some((it) => it.serviceName.trim() && it.qty > 0)) return false;
+    if (paymentMethod === "cash") {
+      const received = toNumber(cashReceived);
+      if (!Number.isFinite(received)) return false;
+      if (received < summary.total) return false;
+    }
+    return true;
+  }, [cashReceived, customerName, items, paymentMethod, summary.total]);
 
-  const [showPreview, setShowPreview] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (paymentMethod !== "cash") return;
+    if (cashReceived.trim() !== "") return;
+    if (summary.total <= 0) return;
+    setCashReceived(String(summary.total));
+  }, [cashReceived, paymentMethod, summary.total]);
 
   useEffect(() => {
     if (!saveError && !saveSuccess) return;
@@ -107,11 +119,32 @@ export function TransactionForm() {
   }, [saveError, saveSuccess]);
 
   async function handleSave() {
+    if (!customerName.trim()) {
+      setSaveError("Nama pelanggan wajib diisi");
+      return;
+    }
+
+    const validItems = items.filter((it) => it.serviceName.trim() && it.qty > 0);
+    if (validItems.length === 0) {
+      setSaveError("Minimal 1 item layanan wajib diisi");
+      return;
+    }
+
+    if (paymentMethod === "cash") {
+      const received = toNumber(cashReceived);
+      if (!Number.isFinite(received)) {
+        setSaveError("Uang diterima wajib diisi");
+        return;
+      }
+      if (received < summary.total) {
+        setSaveError("Uang diterima tidak mencukupi total tagihan");
+        return;
+      }
+    }
+
     setIsSaving(true);
     setSaveError(null);
     setSaveSuccess(null);
-
-    const validItems = items.filter((it) => it.serviceName.trim() && it.qty > 0);
 
     const result = await saveTransaction({
       customer: {
@@ -138,7 +171,6 @@ export function TransactionForm() {
 
     if (result.success) {
       setIsSaving(false);
-      setShowPreview(false);
       setSaveSuccess(`Transaksi ${result.data.orderNo} berhasil disimpan!`);
     } else {
       setSaveError(result.error || "Gagal menyimpan transaksi");
@@ -584,11 +616,11 @@ export function TransactionForm() {
           <div className="mt-6 flex flex-col gap-3">
             <button
               type="button"
-              disabled={!canPreview || isSaving}
-              onClick={() => setShowPreview(true)}
+              disabled={!canSubmit || isSaving}
+              onClick={handleSave}
               className="inline-flex h-11 items-center justify-center rounded-xl bg-zinc-900 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-200 disabled:text-zinc-500"
             >
-              Preview Nota
+              {isSaving ? "Memproses..." : paymentMethod === "cash" ? "Bayar" : "Simpan Transaksi"}
             </button>
             <button
               type="button"
@@ -596,7 +628,7 @@ export function TransactionForm() {
                 setCustomerName("");
                 setCustomerPhone("");
                 setCustomerNote("");
-                setCashReceived("0");
+                setCashReceived("");
                 setReceivedAt(new Date().toISOString().slice(0, 16));
                 const d = new Date();
                 d.setDate(d.getDate() + 2);
@@ -604,7 +636,6 @@ export function TransactionForm() {
                 setPaymentMethod("cash");
                 nextItemIdRef.current = 1;
                 setItems([{ id: "0", serviceName: "", unit: "kg", qty: 1, price: 0 }]);
-                setShowPreview(false);
               }}
               className="inline-flex h-11 items-center justify-center rounded-xl border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
             >
@@ -612,96 +643,6 @@ export function TransactionForm() {
             </button>
           </div>
         </section>
-
-        {showPreview ? (
-          <section className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="text-base font-semibold tracking-tight">
-                Preview Nota
-              </h2>
-              <button
-                type="button"
-                onClick={() => setShowPreview(false)}
-                className="inline-flex h-8 items-center justify-center rounded-lg border border-zinc-200 bg-white px-2 text-xs font-medium text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
-              >
-                Tutup
-              </button>
-            </div>
-
-            <div className="mt-4 flex flex-col gap-3 text-sm">
-              <div className="flex flex-col gap-1">
-                <span className="text-xs font-medium text-zinc-500">Pelanggan</span>
-                <span className="font-medium">{customerName || "-"}</span>
-                <span className="text-zinc-600">{customerPhone || "-"}</span>
-              </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-                <div className="flex flex-col gap-1">
-                  <span className="text-xs font-medium text-zinc-500">Masuk</span>
-                  <span className="text-xs font-medium">{formatDateDisplay(receivedAt)}</span>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <span className="text-xs font-medium text-zinc-500">Estimasi</span>
-                  <span className="text-xs font-medium text-amber-600">{formatDateDisplay(dueAt)}</span>
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-1">
-                <span className="text-xs font-medium text-zinc-500">Pembayaran</span>
-                <span className="font-medium">
-                  {paymentOptions.find((p) => p.value === paymentMethod)?.label ??
-                    paymentMethod}
-                </span>
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <span className="text-xs font-medium text-zinc-500">Item</span>
-                <div className="flex flex-col gap-2">
-                  {items
-                    .filter((it) => it.serviceName.trim() && it.qty > 0)
-                    .map((it) => (
-                      <div
-                        key={it.id}
-                        className="flex items-start justify-between gap-4 rounded-xl border border-zinc-100 bg-zinc-50 px-3 py-2"
-                      >
-                        <div className="flex flex-col">
-                          <span className="font-medium">{it.serviceName}</span>
-                          <span className="text-xs text-zinc-600">
-                            {it.qty} {it.unit} × {formatIDR(Math.max(0, it.price))}
-                          </span>
-                        </div>
-                        <span className="font-semibold">
-                          {formatIDR(Math.max(0, it.qty) * Math.max(0, it.price))}
-                        </span>
-                      </div>
-                    ))}
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between gap-4 border-t border-zinc-100 pt-3">
-                <span className="text-zinc-600">Total</span>
-                <span className="text-base font-semibold tracking-tight">
-                  {formatIDR(summary.total)}
-                </span>
-              </div>
-
-              {customerNote.trim() ? (
-                <div className="rounded-xl border border-zinc-100 bg-zinc-50 px-3 py-2 text-xs text-zinc-700">
-                  {customerNote}
-                </div>
-              ) : null}
-
-              <button
-                type="button"
-                disabled={isSaving}
-                onClick={handleSave}
-                className="mt-4 inline-flex h-11 items-center justify-center rounded-xl bg-sky-500 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:bg-zinc-200 disabled:text-zinc-500"
-              >
-                {isSaving ? "Menyimpan..." : "Simpan Transaksi"}
-              </button>
-            </div>
-          </section>
-        ) : null}
       </aside>
       </div>
 

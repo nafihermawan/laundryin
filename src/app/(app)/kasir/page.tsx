@@ -1,9 +1,26 @@
 import Link from "next/link";
-
 import { createClient } from "@/lib/supabase/server";
+import { getActiveCashRegister } from "@/lib/auth/cash-register";
+
+function formatIDR(amount: number) {
+  return new Intl.NumberFormat("id-ID", {
+    style: "currency",
+    currency: "IDR",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
 
 export default async function KasirPage() {
   const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return null;
+
+  const shiftStatus = await getActiveCashRegister(supabase, user.id);
 
   const startOfDay = new Date();
   startOfDay.setHours(0, 0, 0, 0);
@@ -39,6 +56,42 @@ export default async function KasirPage() {
           Pilih aksi untuk melayani pelanggan dengan cepat.
         </p>
       </div>
+
+      {!shiftStatus.isOpen && (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 shadow-sm">
+          <div className="flex items-center justify-between">
+            <div className="flex flex-col">
+              <span className="font-semibold text-amber-800">Shift Kasir Belum Dibuka</span>
+              <span className="text-sm text-amber-700">Buka shift untuk mulai menerima transaksi.</span>
+            </div>
+            <Link
+              href="/kasir/shift"
+              className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-700"
+            >
+              Buka Shift
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {shiftStatus.isOpen && (
+        <div className="rounded-xl border border-sky-500/30 bg-sky-500/10 p-4 shadow-sm">
+          <div className="flex items-center justify-between">
+            <div className="flex flex-col">
+              <span className="font-semibold text-sky-800">Shift Kasir Aktif</span>
+              <span className="text-sm text-sky-700">
+                Modal Awal: {formatIDR(shiftStatus.startingCash ?? 0)}
+              </span>
+            </div>
+            <Link
+              href="/kasir/shift"
+              className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-sky-700 shadow-sm transition hover:bg-sky-50"
+            >
+              Tutup Shift
+            </Link>
+          </div>
+        </div>
+      )}
 
       <div className="grid gap-3 sm:grid-cols-3">
         {stats.map((s) => (

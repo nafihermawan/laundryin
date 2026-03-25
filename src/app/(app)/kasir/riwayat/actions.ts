@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { ActionResponse, success, error as actionError } from "@/lib/action-response";
+import { getUserRole } from "@/lib/auth/get-user-role";
 
 export async function updateOrderStatus(orderId: string, newStatus: string): Promise<ActionResponse> {
   const supabase = await createClient();
@@ -35,6 +36,38 @@ export async function payOrder(orderId: string, input: PayOrderInput): Promise<A
   } = await supabase.auth.getUser();
 
   if (!user) return actionError("User tidak terautentikasi");
+
+  // Cek apakah kasir sudah buka shift
+  const { data: shift } = await supabase
+    .from("cash_registers" as any)
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("status", "open")
+    .maybeSingle();
+
+  if (!shift) {
+    return actionError("Anda harus membuka shift kasir terlebih dahulu sebelum menerima pembayaran");
+  }
+  const role = await getUserRole(supabase, user.id);
+
+  const { data: order, error: orderError } = await supabase
+    .from("orders")
+    .select("received_at")
+    .eq("id", orderId)
+    .maybeSingle();
+
+  if (orderError) return actionError(orderError.message);
+  const receivedAt = new Date(order?.received_at ?? "");
+  if (!Number.isFinite(receivedAt.getTime())) return actionError("Tanggal order tidak valid");
+
+  if (role !== "admin") {
+    const now = Date.now();
+    const received = receivedAt.getTime();
+    const maxFutureMs = 5 * 60 * 1000;
+    if (received > now + maxFutureMs) {
+      return actionError("Tidak bisa bayar: tanggal masuk berada di masa depan");
+    }
+  }
 
   const { data: paidPayments, error: paidPaymentsError } = await supabase
     .from("payments")
@@ -81,10 +114,12 @@ export async function payOrder(orderId: string, input: PayOrderInput): Promise<A
 
   if (pendingPaymentError) return actionError(pendingPaymentError.message);
 
+  const shiftData = shift as any;
   if (pendingPayment?.id) {
     const { error: updateError } = await supabase
       .from("payments")
       .update({
+        cash_register_id: shiftData.id,
         paid_at: new Date().toISOString(),
         amount: total,
         method: input.method,
@@ -99,6 +134,7 @@ export async function payOrder(orderId: string, input: PayOrderInput): Promise<A
   } else {
     const { error: insertError } = await supabase.from("payments").insert({
       order_id: orderId,
+      cash_register_id: shiftData.id,
       paid_at: new Date().toISOString(),
       amount: total,
       method: input.method,

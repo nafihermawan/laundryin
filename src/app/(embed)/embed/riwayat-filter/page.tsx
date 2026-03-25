@@ -39,14 +39,7 @@ export default function RiwayatFilterEmbedPage() {
       <HeightSender />
       <div className="w-full rounded-2xl border border-zinc-200 bg-white shadow-xl">
         <div className="flex items-center justify-between gap-3 border-b border-zinc-100 p-5">
-          <div className="text-sm font-semibold text-zinc-900">Filter Riwayat</div>
-          <button
-            type="button"
-            onClick={() => postFilters({ status: "semua", dateFrom: "", dateTo: "" })}
-            className="text-xs font-medium text-zinc-600 hover:text-zinc-900"
-          >
-            Reset
-          </button>
+          <div className="text-sm font-semibold text-zinc-900">Filter Transaksi</div>
         </div>
 
         <div className="flex flex-col gap-4 p-5">

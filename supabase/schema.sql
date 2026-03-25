@@ -142,6 +142,110 @@ as $$
   );
 $$;
 
+create or replace function public.enforce_order_timestamps()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  now_ts timestamptz := now();
+  max_back interval := interval '2 hours';
+  max_future interval := interval '5 minutes';
+begin
+  if auth.uid() is null then
+    return new;
+  end if;
+
+  if tg_op = 'INSERT' then
+    if not public.is_admin() then
+      if new.received_at < now_ts - max_back then
+        raise exception 'Tanggal masuk terlalu mundur';
+      end if;
+      if new.received_at > now_ts + max_future then
+        raise exception 'Tanggal masuk terlalu maju';
+      end if;
+    end if;
+
+    if new.due_at is not null and new.due_at < new.received_at then
+      raise exception 'Estimasi tidak boleh sebelum tanggal masuk';
+    end if;
+    return new;
+  end if;
+
+  if tg_op = 'UPDATE' then
+    if not public.is_admin() then
+      if new.received_at is distinct from old.received_at then
+        raise exception 'Tidak diizinkan mengubah tanggal masuk';
+      end if;
+      if new.due_at is distinct from old.due_at then
+        raise exception 'Tidak diizinkan mengubah tanggal estimasi';
+      end if;
+    end if;
+
+    if new.due_at is not null and new.due_at < new.received_at then
+      raise exception 'Estimasi tidak boleh sebelum tanggal masuk';
+    end if;
+    return new;
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists orders_enforce_timestamps on public.orders;
+create trigger orders_enforce_timestamps
+before insert or update on public.orders
+for each row execute procedure public.enforce_order_timestamps();
+
+create or replace function public.enforce_payment_timestamps()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  now_ts timestamptz := now();
+  max_back interval := interval '5 minutes';
+  max_future interval := interval '5 minutes';
+  order_received timestamptz;
+begin
+  if auth.uid() is null then
+    return new;
+  end if;
+
+  if new.status = 'paid' then
+    if new.paid_at is null then
+      raise exception 'paid_at wajib diisi untuk status paid';
+    end if;
+
+    select o.received_at into order_received from public.orders o where o.id = new.order_id;
+    if order_received is not null and new.paid_at < order_received - max_future then
+      raise exception 'Tidak bisa bayar sebelum tanggal masuk';
+    end if;
+
+    if not public.is_admin() then
+      if new.paid_at < now_ts - max_back then
+        raise exception 'Tidak diizinkan backdate pembayaran';
+      end if;
+      if new.paid_at > now_ts + max_future then
+        raise exception 'Timestamp pembayaran tidak valid';
+      end if;
+      if tg_op = 'UPDATE' and old.paid_at is not null and new.paid_at < old.paid_at then
+        raise exception 'Tidak diizinkan memundurkan timestamp pembayaran';
+      end if;
+    end if;
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists payments_enforce_timestamps on public.payments;
+create trigger payments_enforce_timestamps
+before insert or update on public.payments
+for each row execute procedure public.enforce_payment_timestamps();
+
 drop policy if exists "customers_all_authenticated" on public.customers;
 create policy "customers_all_authenticated"
 on public.customers
@@ -169,6 +273,8 @@ with check (public.is_admin());
 
 drop policy if exists "orders_all_authenticated" on public.orders;
 drop policy if exists "orders_select_insert_update_auth" on public.orders;
+drop policy if exists "orders_insert_auth" on public.orders;
+drop policy if exists "orders_update_auth" on public.orders;
 drop policy if exists "orders_delete_admin" on public.orders;
 
 create policy "orders_select_insert_update_auth"
@@ -226,3 +332,52 @@ drop trigger if exists set_orders_updated_at on public.orders;
 create trigger set_orders_updated_at
 before update on public.orders
 for each row execute procedure public.set_updated_at();
+
+create table if not exists public.cash_registers (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id),
+  opened_at timestamptz not null default now(),
+  closed_at timestamptz,
+  starting_cash numeric(12,2) not null default 0,
+  expected_cash numeric(12,2),
+  actual_cash numeric(12,2),
+  variance numeric(12,2),
+  notes text,
+  status text not null default 'open' check (status in ('open', 'closed'))
+);
+
+create index if not exists cash_registers_user_id_idx on public.cash_registers(user_id);
+
+alter table public.cash_registers enable row level security;
+
+drop policy if exists "cash_registers_select_auth" on public.cash_registers;
+drop policy if exists "cash_registers_insert_auth" on public.cash_registers;
+drop policy if exists "cash_registers_update_auth" on public.cash_registers;
+
+create policy "cash_registers_select_auth"
+on public.cash_registers
+for select
+to authenticated
+using (true);
+
+create policy "cash_registers_insert_auth"
+on public.cash_registers
+for insert
+to authenticated
+with check (auth.uid() = user_id);
+
+create policy "cash_registers_update_auth"
+on public.cash_registers
+for update
+to authenticated
+using (auth.uid() = user_id or public.is_admin())
+with check (auth.uid() = user_id or public.is_admin());
+
+-- Memastikan satu user hanya bisa punya satu shift 'open' di waktu yang sama
+create unique index if not exists unique_open_register_per_user 
+on public.cash_registers (user_id) 
+where status = 'open';
+
+-- Modifikasi tabel payments untuk mencatat cash_register_id (opsional tapi disarankan untuk tracking)
+alter table public.payments
+  add column if not exists cash_register_id uuid references public.cash_registers (id);
