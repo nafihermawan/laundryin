@@ -512,7 +512,7 @@ export function TransactionForm() {
           </div>
 
           <div className="mt-5 grid gap-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-4 sm:grid-cols-2">
               <label className="flex flex-col gap-2">
                 <span className="text-sm font-medium text-zinc-700">
                   Tanggal Masuk
@@ -635,7 +635,7 @@ export function TransactionForm() {
                 <span className="text-zinc-600">{customerPhone || "-"}</span>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-4 sm:grid-cols-2">
                 <div className="flex flex-col gap-1">
                   <span className="text-xs font-medium text-zinc-500">Masuk</span>
                   <span className="text-xs font-medium">{formatDateDisplay(receivedAt)}</span>
@@ -706,7 +706,7 @@ export function TransactionForm() {
       </div>
 
       <div className="fixed inset-x-0 bottom-14 z-30 lg:hidden">
-        <div className="mx-auto w-full max-w-6xl px-4 pb-2">
+        <div className="mx-auto w-full max-w-6xl px-3 pb-2 sm:px-4">
           <div className="flex items-center justify-between rounded-2xl border border-zinc-200 bg-white/95 px-4 py-3 shadow-sm backdrop-blur">
             <div className="flex flex-col">
               <div className="text-xs font-medium text-zinc-500">Total</div>

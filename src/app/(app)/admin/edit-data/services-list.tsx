@@ -93,7 +93,7 @@ export function ServicesList({ initialServices }: { initialServices: ServiceRow[
         </div>
       ) : null}
 
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-lg font-semibold tracking-tight">Daftar Layanan</h2>
         <button
           onClick={() => {
@@ -101,7 +101,7 @@ export function ServicesList({ initialServices }: { initialServices: ServiceRow[
             setEditingId(null);
             setFormData({ name: "", unit: "kg", base_price: 0 });
           }}
-          className="inline-flex h-9 items-center justify-center rounded-lg bg-sky-500 px-4 text-sm font-medium text-white shadow-sm transition hover:bg-sky-400"
+          className="inline-flex h-9 w-full items-center justify-center rounded-lg bg-sky-500 px-4 text-sm font-medium text-white shadow-sm transition hover:bg-sky-400 sm:w-auto"
         >
           Tambah Layanan
         </button>
@@ -173,69 +173,71 @@ export function ServicesList({ initialServices }: { initialServices: ServiceRow[
       ) : null}
 
       <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-zinc-100 bg-zinc-50 text-xs font-medium text-zinc-500">
-              <th className="px-4 py-3">Nama Layanan</th>
-              <th className="px-4 py-3 text-center">Satuan</th>
-              <th className="px-4 py-3 text-right">Harga</th>
-              <th className="px-4 py-3 text-right">Aksi</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-zinc-100">
-            {isPending ? (
-              <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-zinc-500">
-                  Memproses data...
-                </td>
+        <div className="overflow-x-auto">
+          <table className="min-w-[640px] w-full text-left text-xs sm:text-sm">
+            <thead>
+              <tr className="border-b border-zinc-100 bg-zinc-50 text-xs font-medium text-zinc-500">
+                <th className="px-3 py-3 sm:px-4">Nama Layanan</th>
+                <th className="px-3 py-3 text-center sm:px-4">Satuan</th>
+                <th className="px-3 py-3 text-right sm:px-4">Harga</th>
+                <th className="px-3 py-3 text-right sm:px-4">Aksi</th>
               </tr>
-            ) : initialServices.length === 0 ? (
-              <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-zinc-500">
-                  Belum ada layanan yang ditambahkan.
-                </td>
-              </tr>
-            ) : (
-              initialServices.map((svc) => (
-                <tr key={svc.id} className="group hover:bg-zinc-50/50">
-                  <td className="px-4 py-3 font-medium">{svc.name}</td>
-                  <td className="px-4 py-3 text-center uppercase">{svc.unit}</td>
-                  <td className="px-4 py-3 text-right">
-                    {new Intl.NumberFormat("id-ID", {
-                      style: "currency",
-                      currency: "IDR",
-                      maximumFractionDigits: 0,
-                    }).format(svc.base_price)}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <div className="flex justify-end gap-2">
-                      <button
-                        onClick={() => {
-                          setEditingId(svc.id!);
-                          setFormData({
-                            name: svc.name,
-                            unit: svc.unit,
-                            base_price: svc.base_price,
-                          });
-                          setIsAdding(false);
-                        }}
-                        className="inline-flex h-8 items-center justify-center rounded-lg border border-zinc-200 bg-white px-3 text-xs font-medium text-sky-600 transition hover:border-sky-200 hover:bg-sky-50"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDelete(svc.id!)}
-                        className="inline-flex h-8 items-center justify-center rounded-lg border border-zinc-200 bg-white px-3 text-xs font-medium text-red-600 transition hover:border-red-200 hover:bg-red-50"
-                      >
-                        Hapus
-                      </button>
-                    </div>
+            </thead>
+            <tbody className="divide-y divide-zinc-100">
+              {isPending ? (
+                <tr>
+                  <td colSpan={4} className="px-3 py-8 text-center text-zinc-500 sm:px-4">
+                    Memproses data...
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ) : initialServices.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="px-3 py-8 text-center text-zinc-500 sm:px-4">
+                    Belum ada layanan yang ditambahkan.
+                  </td>
+                </tr>
+              ) : (
+                initialServices.map((svc) => (
+                  <tr key={svc.id} className="group hover:bg-zinc-50/50">
+                    <td className="px-3 py-3 font-medium sm:px-4">{svc.name}</td>
+                    <td className="px-3 py-3 text-center uppercase sm:px-4">{svc.unit}</td>
+                    <td className="px-3 py-3 text-right sm:px-4">
+                      {new Intl.NumberFormat("id-ID", {
+                        style: "currency",
+                        currency: "IDR",
+                        maximumFractionDigits: 0,
+                      }).format(svc.base_price)}
+                    </td>
+                    <td className="px-3 py-3 text-right sm:px-4">
+                      <div className="flex justify-end gap-2">
+                        <button
+                          onClick={() => {
+                            setEditingId(svc.id!);
+                            setFormData({
+                              name: svc.name,
+                              unit: svc.unit,
+                              base_price: svc.base_price,
+                            });
+                            setIsAdding(false);
+                          }}
+                          className="inline-flex h-8 items-center justify-center rounded-lg border border-zinc-200 bg-white px-3 text-xs font-medium text-sky-600 transition hover:border-sky-200 hover:bg-sky-50"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDelete(svc.id!)}
+                          className="inline-flex h-8 items-center justify-center rounded-lg border border-zinc-200 bg-white px-3 text-xs font-medium text-red-600 transition hover:border-red-200 hover:bg-red-50"
+                        >
+                          Hapus
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

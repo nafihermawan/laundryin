@@ -28,11 +28,21 @@ export function TransactionList({ initialTransactions }: { initialTransactions: 
   const [filterHeight, setFilterHeight] = useState<number | null>(null);
   const [detailOrder, setDetailOrder] = useState<Transaction | null>(null);
   const [detailHeight, setDetailHeight] = useState<number | null>(null);
+  const [viewportHeight, setViewportHeight] = useState(0);
 
   const detailFrameRef = useRef<HTMLIFrameElement | null>(null);
   const filterFrameRef = useRef<HTMLIFrameElement | null>(null);
 
   const transactions = initialTransactions;
+
+  useEffect(() => {
+    function update() {
+      setViewportHeight(window.innerHeight || 0);
+    }
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
 
   useEffect(() => {
     function onMessage(event: MessageEvent) {
@@ -180,6 +190,7 @@ export function TransactionList({ initialTransactions }: { initialTransactions: 
 
   const pageStart = filteredTransactions.length === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const pageEnd = Math.min(currentPage * pageSize, filteredTransactions.length);
+  const maxModalHeight = viewportHeight > 0 ? Math.round(viewportHeight * 0.85) : null;
 
   function formatDate(dateStr: string) {
     return new Intl.DateTimeFormat("id-ID", {
@@ -234,32 +245,32 @@ export function TransactionList({ initialTransactions }: { initialTransactions: 
 
       <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
+          <table className="w-full text-left text-xs sm:text-sm">
             <thead>
               <tr className="border-b border-zinc-100 bg-zinc-50 text-xs font-medium text-zinc-500">
-                <th className="px-4 py-3">No. Order / Tanggal</th>
-                <th className="px-4 py-3">Pelanggan</th>
-                <th className="px-4 py-3">Status Cucian</th>
-                <th className="px-4 py-3">Status Bayar</th>
+                <th className="whitespace-nowrap px-3 py-3 sm:px-4">No. Order / Tanggal</th>
+                <th className="whitespace-nowrap px-3 py-3 sm:px-4">Pelanggan</th>
+                <th className="whitespace-nowrap px-3 py-3 sm:px-4">Status Cucian</th>
+                <th className="whitespace-nowrap px-3 py-3 sm:px-4">Status Bayar</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-100">
               {isPending ? (
                 <tr>
-                  <td colSpan={4} className="px-4 py-12 text-center text-zinc-500">
+                  <td colSpan={4} className="px-3 py-12 text-center text-zinc-500 sm:px-4">
                     Memproses riwayat transaksi...
                   </td>
                 </tr>
               ) : filteredTransactions.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-4 py-12 text-center text-zinc-500">
+                  <td colSpan={4} className="px-3 py-12 text-center text-zinc-500 sm:px-4">
                     Tidak ada transaksi ditemukan.
                   </td>
                 </tr>
               ) : (
                 paginatedTransactions.map((t) => (
                   <tr key={t.id || t.order_no} className="group hover:bg-zinc-50/50">
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-3 sm:px-4">
                       <button
                         type="button"
                         onClick={() => {
@@ -269,26 +280,26 @@ export function TransactionList({ initialTransactions }: { initialTransactions: 
                         className="block w-full rounded-lg text-left outline-none transition hover:bg-zinc-50 focus:bg-zinc-50 focus:ring-4 focus:ring-sky-400/10"
                       >
                         <div className="flex flex-col">
-                          <span className="font-semibold text-zinc-900">{t.order_no}</span>
+                          <span className="break-all font-semibold text-zinc-900">{t.order_no}</span>
                           <span className="text-xs text-zinc-500">{formatDate(t.received_at)}</span>
-                          <span className="text-xs text-zinc-500">
+                          <span className="hidden text-xs text-zinc-500 sm:block">
                             Dibuat oleh: {t.created_by_profile?.full_name || "User"}
                           </span>
                         </div>
                       </button>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-3 sm:px-4">
                       <div className="flex flex-col">
                         <span className="font-medium text-zinc-900">{t.customer?.name || "Tanpa Nama"}</span>
-                        <span className="text-xs text-zinc-500">{t.customer?.phone || "-"}</span>
+                        <span className="hidden text-xs text-zinc-500 sm:block">{t.customer?.phone || "-"}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-3 sm:px-4">
                       <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${statusColors[getLaundryStatus(t.status)] || "bg-zinc-100 text-zinc-700"}`}>
                         {getLaundryStatusLabel(t.status)}
                       </span>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-3 sm:px-4">
                       <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${isOrderPaid(t) ? paymentColors.paid : paymentColors.pending}`}>
                         {getPaymentLabel(t)}
                       </span>
@@ -332,7 +343,7 @@ export function TransactionList({ initialTransactions }: { initialTransactions: 
 
       {filterOpen ? (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4"
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/30 p-3 sm:items-center sm:p-4"
           onMouseDown={(e) => {
             if (e.target === e.currentTarget) {
               setFilterOpen(false);
@@ -343,9 +354,13 @@ export function TransactionList({ initialTransactions }: { initialTransactions: 
           <iframe
             src={`/embed/riwayat-filter?status=${encodeURIComponent(filterStatus)}&from=${encodeURIComponent(dateFrom)}&to=${encodeURIComponent(dateTo)}`}
             className="w-full max-w-md rounded-2xl bg-transparent shadow-xl"
-            style={{ height: filterHeight ? `${filterHeight}px` : "360px" }}
+            style={{
+              height: filterHeight
+                ? `${Math.min(filterHeight, maxModalHeight ?? filterHeight)}px`
+                : "min(360px, 85vh)",
+            }}
             frameBorder={0}
-            scrolling="no"
+            scrolling="yes"
             ref={filterFrameRef}
             onLoad={() => {
               updateFilterHeightFromFrame();
@@ -359,7 +374,7 @@ export function TransactionList({ initialTransactions }: { initialTransactions: 
 
       {detailOrder ? (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4"
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/30 p-3 sm:items-center sm:p-4"
           onMouseDown={(e) => {
             if (e.target === e.currentTarget) {
               setDetailOrder(null);
@@ -371,9 +386,13 @@ export function TransactionList({ initialTransactions }: { initialTransactions: 
             <iframe
               src={`/embed/riwayat-detail/${detailOrder.id}`}
               className="w-full max-w-2xl rounded-2xl bg-transparent shadow-xl"
-              style={{ height: detailHeight ? `${detailHeight}px` : "720px" }}
+              style={{
+                height: detailHeight
+                  ? `${Math.min(detailHeight, maxModalHeight ?? detailHeight)}px`
+                  : "min(720px, 85vh)",
+              }}
               frameBorder={0}
-              scrolling="no"
+              scrolling="yes"
               ref={detailFrameRef}
               onLoad={() => {
                 updateDetailHeightFromFrame();

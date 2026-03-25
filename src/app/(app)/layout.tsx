@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Image from "next/image";
 
 import { getUserRole } from "@/lib/auth/get-user-role";
 import { createClient } from "@/lib/supabase/server";
@@ -34,11 +35,7 @@ export default async function AppLayout({
             className="inline-flex items-center gap-2 font-semibold tracking-tight text-zinc-900"
             aria-label="Home"
           >
-            <img
-              src="/icon.svg"
-              alt="laundry.in"
-              className="h-6 w-6 rounded-md object-contain"
-            />
+             <Image src="/icon.svg" alt="laundry.in" width={24} height={24} priority />
             <span>laundry.in</span>
           </a>
 
@@ -49,7 +46,7 @@ export default async function AppLayout({
           </div>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 pb-24">
+      <main className="mx-auto w-full max-w-6xl flex-1 px-3 py-6 pb-24 sm:px-4">
         {children}
       </main>
       <BottomNavShell homeHref={role === "admin" ? "/admin" : "/kasir"} />
