@@ -37,24 +37,28 @@ export async function saveTransaction(data: TransactionData): Promise<ActionResp
     return actionError("User tidak terautentikasi");
   }
 
-  // 1b. Cek apakah kasir sudah buka shift
-  const { data: shift } = await supabase
-    .from("cash_registers")
-    .select("id")
-    .eq("user_id", user.id)
-    .eq("status", "open")
-    .maybeSingle();
+  const role = await getUserRole(supabase, user.id);
 
-  const shiftId = (shift as unknown as { id?: string } | null)?.id ?? null;
+  // 1b. Cek apakah kasir sudah buka shift (hanya jika role bukan admin)
+  let shiftId: string | null = null;
+  if (role !== "admin") {
+    const { data: shift } = await supabase
+      .from("cash_registers")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("status", "open")
+      .maybeSingle();
 
-  if (!shiftId) {
-    return actionError("Anda harus membuka shift kasir terlebih dahulu sebelum membuat transaksi");
+    shiftId = (shift as unknown as { id?: string } | null)?.id ?? null;
+
+    if (!shiftId) {
+      return actionError("Anda harus membuka shift kasir terlebih dahulu sebelum membuat transaksi");
+    }
   }
 
   let orderId: string | null = null;
 
   try {
-    const role = await getUserRole(supabase, user.id);
     const computedTotal = (data.items ?? []).reduce((sum, it) => {
       const qty = Number(it.qty ?? 0);
       const price = Number(it.price ?? 0);
@@ -170,12 +174,6 @@ export async function saveTransaction(data: TransactionData): Promise<ActionResp
       return actionError(itemsError.message || "Gagal menyimpan item transaksi");
     }
 
-    const shiftData = shift;
-    if (!shiftData) {
-      await supabase.from("orders").delete().eq("id", createdOrderId);
-      return actionError("Shift kasir tidak valid");
-    }
-
     // 6. Insert Payment
     const cashReceived =
       data.paymentMethod === "cash" && typeof data.cashReceived === "number"
@@ -193,7 +191,7 @@ export async function saveTransaction(data: TransactionData): Promise<ActionResp
       .from("payments")
       .insert({
         order_id: createdOrderId,
-        cash_register_id: shiftData.id,
+        cash_register_id: shiftId,
         paid_at: data.paymentMethod === "cash" ? new Date().toISOString() : null,
         amount: computedTotal,
         method: data.paymentMethod,

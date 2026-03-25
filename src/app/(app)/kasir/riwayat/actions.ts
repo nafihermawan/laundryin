@@ -37,20 +37,24 @@ export async function payOrder(orderId: string, input: PayOrderInput): Promise<A
 
   if (!user) return actionError("User tidak terautentikasi");
 
-  // Cek apakah kasir sudah buka shift
-  const { data: shift } = await supabase
-    .from("cash_registers")
-    .select("id")
-    .eq("user_id", user.id)
-    .eq("status", "open")
-    .maybeSingle();
-
-  const shiftId = (shift as unknown as { id?: string } | null)?.id ?? null;
-
-  if (!shiftId) {
-    return actionError("Anda harus membuka shift kasir terlebih dahulu sebelum menerima pembayaran");
-  }
   const role = await getUserRole(supabase, user.id);
+
+  // Cek apakah kasir sudah buka shift (hanya jika role bukan admin)
+  let shiftId: string | null = null;
+  if (role !== "admin") {
+    const { data: shift } = await supabase
+      .from("cash_registers")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("status", "open")
+      .maybeSingle();
+
+    shiftId = (shift as unknown as { id?: string } | null)?.id ?? null;
+
+    if (!shiftId) {
+      return actionError("Anda harus membuka shift kasir terlebih dahulu sebelum menerima pembayaran");
+    }
+  }
 
   const { data: order, error: orderError } = await supabase
     .from("orders")
@@ -116,14 +120,11 @@ export async function payOrder(orderId: string, input: PayOrderInput): Promise<A
 
   if (pendingPaymentError) return actionError(pendingPaymentError.message);
 
-  const shiftData = shift;
-  if (!shiftData) return actionError("Shift kasir tidak valid");
-
   if (pendingPayment?.id) {
     const { error: updateError } = await supabase
       .from("payments")
       .update({
-        cash_register_id: shiftData.id,
+        cash_register_id: shiftId,
         paid_at: new Date().toISOString(),
         amount: total,
         method: input.method,
@@ -138,7 +139,7 @@ export async function payOrder(orderId: string, input: PayOrderInput): Promise<A
   } else {
     const { error: insertError } = await supabase.from("payments").insert({
       order_id: orderId,
-      cash_register_id: shiftData.id,
+      cash_register_id: shiftId,
       paid_at: new Date().toISOString(),
       amount: total,
       method: input.method,
