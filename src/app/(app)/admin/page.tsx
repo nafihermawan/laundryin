@@ -35,12 +35,29 @@ export default async function AdminPage() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold tracking-tight">Admin</h1>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        {stats.map((s) => (
+          <div
+            key={s.label}
+            className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm"
+          >
+            <div className="text-xs font-medium text-zinc-500">{s.label}</div>
+            <div className="mt-1 text-2xl font-semibold tracking-tight text-zinc-900">
+              {s.value}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
         <Link
-          href="/admin/laporan-kasir"
+          href="/kasir/transaksi/baru"
           className="group rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm transition hover:border-zinc-300 hover:shadow-md"
         >
           <div className="flex items-start gap-4">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-600">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-500/10 text-sky-600">
               <svg
                 width="22"
                 height="22"
@@ -48,13 +65,24 @@ export default async function AdminPage() {
                 fill="none"
                 xmlns="http://www.w3.org/2000/svg"
               >
-                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <path
+                  d="M12 5V19"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
+                <path
+                  d="M5 12H19"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
               </svg>
             </div>
             <div className="flex flex-1 flex-col gap-1">
               <div className="flex items-center justify-between gap-3">
                 <h2 className="text-base font-semibold tracking-tight">
-                  Laporan Shift Kasir
+                  Buat Transaksi
                 </h2>
                 <span className="text-zinc-300 transition group-hover:text-zinc-400">
                   <svg
@@ -75,83 +103,8 @@ export default async function AdminPage() {
                 </span>
               </div>
               <p className="text-sm text-zinc-600">
-                Pantau rekonsiliasi dan selisih uang fisik kasir.
+                Input pelanggan, layanan, dan pembayaran.
               </p>
-            </div>
-          </div>
-        </Link>
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-3">
-        {stats.map((s) => (
-          <div
-            key={s.label}
-            className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm"
-          >
-            <div className="text-xs font-medium text-zinc-500">{s.label}</div>
-            <div className="mt-1 text-2xl font-semibold tracking-tight text-zinc-900">
-              {s.value}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Link
-          href="/admin/laporan"
-          className="group rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm transition hover:border-zinc-300 hover:shadow-md"
-        >
-          <div className="flex items-start gap-4">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-500/10 text-indigo-600">
-              <svg
-                width="22"
-                height="22"
-                viewBox="0 0 24 24"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </div>
-            <div className="flex flex-1 flex-col gap-1">
-              <div className="flex items-center justify-between gap-3">
-                <h2 className="text-base font-semibold tracking-tight">
-                  Laporan Keuangan
-                </h2>
-                <span className="text-zinc-300 transition group-hover:text-zinc-400">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9 18L15 12L9 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                </span>
-              </div>
-              <p className="text-sm text-zinc-600">Lihat rekapitulasi pendapatan</p>
-            </div>
-          </div>
-        </Link>
-        <Link
-          href="/admin/laporan-kasir"
-          className="group rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm transition hover:border-zinc-300 hover:shadow-md"
-        >
-          <div className="flex items-start gap-4">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-600">
-              <svg
-                width="22"
-                height="22"
-                viewBox="0 0 24 24"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </div>
-            <div className="flex flex-1 flex-col gap-1">
-              <div className="flex items-center justify-between gap-3">
-                <h2 className="text-base font-semibold tracking-tight">
-                  Laporan Shift Kasir
-                </h2>
-                <span className="text-zinc-300 transition group-hover:text-zinc-400">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9 18L15 12L9 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                </span>
-              </div>
-              <p className="text-sm text-zinc-600">Pantau rekonsiliasi kasir</p>
             </div>
           </div>
         </Link>
@@ -208,6 +161,127 @@ export default async function AdminPage() {
               </div>
               <p className="text-sm text-zinc-600">
                 Lihat daftar transaksi dan statusnya.
+              </p>
+            </div>
+          </div>
+        </Link>
+
+        <Link
+          href="/admin/laporan"
+          className="group rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm transition hover:border-zinc-300 hover:shadow-md"
+        >
+          <div className="flex items-start gap-4">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-700">
+              <svg
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M4 19V5"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
+                <path
+                  d="M8 19V11"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
+                <path
+                  d="M12 19V9"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
+                <path
+                  d="M16 19V13"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
+                <path
+                  d="M20 19V7"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </div>
+            <div className="flex flex-1 flex-col gap-1">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-base font-semibold tracking-tight">
+                  Laporan Transaksi
+                </h2>
+                <span className="text-zinc-300 transition group-hover:text-zinc-400">
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M9 18L15 12L9 6"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </span>
+              </div>
+              <p className="text-sm text-zinc-600">
+                Ringkasan dan rekap transaksi.
+              </p>
+            </div>
+          </div>
+        </Link>
+
+        <Link
+          href="/admin/laporan-kasir"
+          className="group rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm transition hover:border-zinc-300 hover:shadow-md"
+        >
+          <div className="flex items-start gap-4">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-500/10 text-indigo-600">
+              <svg
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
+            <div className="flex flex-1 flex-col gap-1">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-base font-semibold tracking-tight">
+                  Laporan Shift Kasir
+                </h2>
+                <span className="text-zinc-300 transition group-hover:text-zinc-400">
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M9 18L15 12L9 6"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </span>
+              </div>
+              <p className="text-sm text-zinc-600">
+                Pantau rekonsiliasi dan selisih uang fisik kasir.
               </p>
             </div>
           </div>
@@ -334,81 +408,6 @@ export default async function AdminPage() {
                 </span>
               </div>
               <p className="text-sm text-zinc-600">Tambah akun kasir atau admin.</p>
-            </div>
-          </div>
-        </Link>
-
-        <Link
-          href="/admin/laporan"
-          className="group rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm transition hover:border-zinc-300 hover:shadow-md"
-        >
-          <div className="flex items-start gap-4">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-700">
-              <svg
-                width="22"
-                height="22"
-                viewBox="0 0 24 24"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  d="M4 19V5"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                />
-                <path
-                  d="M8 19V11"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                />
-                <path
-                  d="M12 19V9"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                />
-                <path
-                  d="M16 19V13"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                />
-                <path
-                  d="M20 19V7"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </div>
-            <div className="flex flex-1 flex-col gap-1">
-              <div className="flex items-center justify-between gap-3">
-                <h2 className="text-base font-semibold tracking-tight">
-                  Laporan Transaksi
-                </h2>
-                <span className="text-zinc-300 transition group-hover:text-zinc-400">
-                  <svg
-                    width="18"
-                    height="18"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      d="M9 18L15 12L9 6"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </span>
-              </div>
-              <p className="text-sm text-zinc-600">
-                Ringkasan dan rekap transaksi.
-              </p>
             </div>
           </div>
         </Link>
