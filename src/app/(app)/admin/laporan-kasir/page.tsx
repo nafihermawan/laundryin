@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 
 type CashRegisterRow = {
   id: string;
+  user_id: string;
   opened_at: string;
   closed_at: string | null;
   starting_cash: number;
@@ -9,7 +10,6 @@ type CashRegisterRow = {
   actual_cash: number | null;
   variance: number | null;
   status: "open" | "closed" | string;
-  profiles?: { full_name?: string | null } | null;
 };
 
 function formatIDR(amount: number) {
@@ -30,18 +30,16 @@ export default async function LaporanKasirPage() {
 
   const { data, error } = await supabase
     .from("cash_registers")
-    .select(`
-      *,
-      user:user_id (
-        id
-      ),
-      profiles!cash_registers_user_id_fkey (
-        full_name
-      )
-    `)
+    .select("id, user_id, opened_at, closed_at, starting_cash, expected_cash, actual_cash, variance, status")
     .order("opened_at", { ascending: false });
 
   const registers = (data ?? []) as unknown as CashRegisterRow[];
+  const userIds = Array.from(new Set(registers.map((r) => r.user_id).filter(Boolean)));
+  const { data: profiles } = await supabase
+    .from("profiles")
+    .select("id, full_name")
+    .in("id", userIds);
+  const profileNameById = new Map((profiles ?? []).map((p) => [p.id, p.full_name?.trim() || ""]));
 
   if (error) {
     return (
@@ -90,7 +88,7 @@ export default async function LaporanKasirPage() {
               registers?.map((reg) => (
                 <tr key={reg.id} className="transition-colors hover:bg-zinc-50/50">
                   <td className="px-4 py-3 font-medium text-zinc-900">
-                    {(reg.profiles as { full_name?: string })?.full_name || "Tanpa Nama"}
+                    {profileNameById.get(reg.user_id) || "Tanpa Nama"}
                   </td>
                   <td className="px-4 py-3">
                     {new Date(reg.opened_at).toLocaleString("id-ID")}
