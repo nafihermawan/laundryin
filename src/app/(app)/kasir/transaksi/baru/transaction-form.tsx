@@ -922,16 +922,6 @@ export function TransactionForm() {
             </div>
 
             <div className="flex items-center justify-end gap-2 border-t border-zinc-100 p-5">
-              <button
-                type="button"
-                onClick={() => {
-                  setQrisDynamic(null);
-                  setQrisNotice(null);
-                }}
-                className="inline-flex h-10 items-center justify-center rounded-xl border border-zinc-200 bg-white px-4 text-sm font-medium text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
-              >
-                Tutup
-              </button>
             </div>
           </div>
         </div>
