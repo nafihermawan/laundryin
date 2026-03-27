@@ -48,6 +48,7 @@ export function TransactionActions({
   const [isGeneratingQris, setIsGeneratingQris] = useState(false);
   const [qrisDynamic, setQrisDynamic] = useState<{
     paymentId: string;
+    providerRef: string;
     qrString: string;
     imageUrl: string | null;
     expiresAt: string | null;
@@ -352,7 +353,7 @@ export function TransactionActions({
                           <div className="text-xs font-medium text-zinc-600">QR Code Image URL (Sandbox Simulator)</div>
                           <div className="mt-2 flex items-center gap-2">
                             {(() => {
-                              const url = `${origin}/api/qris/${qrisDynamic.paymentId}/qr`;
+                              const url = `${origin}/v2/qris/${qrisDynamic.providerRef}/qr-code`;
                               return (
                             <input
                               value={url}
@@ -367,7 +368,7 @@ export function TransactionActions({
                                 try {
                                   if (!origin) return;
                                   await navigator.clipboard.writeText(
-                                    `${origin}/api/qris/${qrisDynamic.paymentId}/qr`,
+                                    `${origin}/v2/qris/${qrisDynamic.providerRef}/qr-code`,
                                   );
                                 } catch {}
                               }}

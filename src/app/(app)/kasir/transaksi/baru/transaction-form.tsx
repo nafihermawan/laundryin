@@ -118,6 +118,7 @@ export function TransactionForm() {
   const [qrisDynamic, setQrisDynamic] = useState<{
     orderNo: string;
     paymentId: string;
+    providerRef: string;
     qrString: string;
     imageUrl: string | null;
     expiresAt: string | null;
@@ -255,6 +256,7 @@ export function TransactionForm() {
         setQrisDynamic({
           orderNo: result.data.orderNo,
           paymentId: result.data.qris.paymentId,
+          providerRef: result.data.qris.providerRef,
           qrString: result.data.qris.qrString,
           imageUrl: result.data.qris.imageUrl,
           expiresAt: result.data.qris.expiresAt,
@@ -281,7 +283,7 @@ export function TransactionForm() {
 
   const origin = typeof window !== "undefined" ? window.location.origin : "";
   const simulatorImageUrl =
-    qrisDynamic && origin ? `${origin}/api/qris/${qrisDynamic.paymentId}/qr` : null;
+    qrisDynamic && origin ? `${origin}/v2/qris/${qrisDynamic.providerRef}/qr-code` : null;
 
   return (
     <div className="relative pb-24 lg:pb-0">

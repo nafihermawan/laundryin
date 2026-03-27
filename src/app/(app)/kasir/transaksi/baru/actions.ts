@@ -37,6 +37,7 @@ export async function saveTransaction(
       | {
           qris: {
             paymentId: string;
+          providerRef: string;
             qrString: string;
           imageUrl: string | null;
             expiresAt: string | null;
@@ -265,7 +266,13 @@ export async function saveTransaction(
 
       return actionSuccess({
         orderNo,
-        qris: { paymentId: createdPayment.id, qrString: created.qrString, imageUrl: created.qrImageUrl, expiresAt },
+        qris: {
+          paymentId: createdPayment.id,
+          providerRef: created.providerRef,
+          qrString: created.qrString,
+          imageUrl: created.qrImageUrl,
+          expiresAt,
+        },
       });
     }
 

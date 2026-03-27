@@ -33,6 +33,7 @@ export type PayOrderInput = {
 
 export type StartQrisDynamicOutput = {
   paymentId: string;
+  providerRef: string;
   qrString: string;
   imageUrl: string | null;
   expiresAt: string | null;
@@ -149,7 +150,13 @@ export async function startQrisDynamicForOrder(orderId: string): Promise<ActionR
   if (updateError) return actionError(updateError.message);
 
   revalidatePath("/kasir/riwayat");
-  return success({ paymentId, qrString: created.qrString, imageUrl: created.qrImageUrl, expiresAt });
+  return success({
+    paymentId,
+    providerRef: created.providerRef,
+    qrString: created.qrString,
+    imageUrl: created.qrImageUrl,
+    expiresAt,
+  });
 }
 
 export async function payOrder(orderId: string, input: PayOrderInput): Promise<ActionResponse> {
