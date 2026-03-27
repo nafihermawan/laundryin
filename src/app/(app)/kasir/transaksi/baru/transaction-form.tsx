@@ -127,8 +127,41 @@ export function TransactionForm() {
     type: "info" | "error" | "success";
     message: string;
   } | null>(null);
+  const [qrisNowMs, setQrisNowMs] = useState<number>(() => Date.now());
   const showQrisDebug = process.env.NEXT_PUBLIC_QRIS_DEBUG === "true";
   const simulatorImageUrl = qrisDynamic?.imageUrl ?? null;
+
+  const qrisExpiresAtMs = useMemo(() => {
+    const raw = qrisDynamic?.expiresAt;
+    if (typeof raw !== "string" || !raw) return null;
+    const ms = new Date(raw).getTime();
+    return Number.isFinite(ms) ? ms : null;
+  }, [qrisDynamic?.expiresAt]);
+
+  const qrisCountdown = useMemo(() => {
+    if (!qrisExpiresAtMs) return null;
+    const remainingMs = qrisExpiresAtMs - qrisNowMs;
+    const clamped = Math.max(0, remainingMs);
+    const totalSeconds = Math.floor(clamped / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    const pad2 = (n: number) => String(n).padStart(2, "0");
+    const timeLeft = hours > 0 ? `${hours}:${pad2(minutes)}:${pad2(seconds)}` : `${pad2(minutes)}:${pad2(seconds)}`;
+    return { remainingMs, timeLeft };
+  }, [qrisExpiresAtMs, qrisNowMs]);
+
+  useEffect(() => {
+    if (!qrisDynamic) return;
+    if (!qrisExpiresAtMs) return;
+    if (qrisPaid) return;
+
+    setQrisNowMs(Date.now());
+    const t = window.setInterval(() => {
+      setQrisNowMs(Date.now());
+    }, 1000);
+    return () => window.clearInterval(t);
+  }, [qrisDynamic, qrisExpiresAtMs, qrisPaid]);
 
   useEffect(() => {
     if (!saveError && !saveSuccess) return;
@@ -773,7 +806,7 @@ export function TransactionForm() {
             </div>
 
             <div className="flex flex-col gap-4 p-5">
-              <div className="flex flex-col items-center gap-3">
+              <div className="flex flex-col items-center gap-3 text-center">
                 <div className="rounded-2xl border border-zinc-200 bg-white p-3">
                   <QRCodeCanvas value={qrisDynamic.qrString} size={240} />
                 </div>
@@ -784,7 +817,16 @@ export function TransactionForm() {
                 >
                   {qrisPaid ? "Lunas" : "Menunggu Pembayaran"}
                 </div>
-                {qrisDynamic.expiresAt ? (
+                {qrisCountdown && qrisDynamic.expiresAt ? (
+                  <div className="text-xs text-zinc-500">
+                    <div className={qrisCountdown.remainingMs <= 0 && !qrisPaid ? "font-semibold text-red-600" : undefined}>
+                      {qrisCountdown.remainingMs <= 0 ? "QRIS kedaluwarsa" : `Kedaluwarsa dalam ${qrisCountdown.timeLeft}`}
+                    </div>
+                    <div className="mt-0.5">
+                      {new Date(qrisDynamic.expiresAt).toLocaleString("id-ID")}
+                    </div>
+                  </div>
+                ) : qrisDynamic.expiresAt ? (
                   <div className="text-xs text-zinc-500">
                     Kedaluwarsa: {new Date(qrisDynamic.expiresAt).toLocaleString("id-ID")}
                   </div>
@@ -792,7 +834,7 @@ export function TransactionForm() {
 
                 {qrisNotice ? (
                   <div
-                    className={`w-full rounded-xl border px-3 py-2 text-xs ${
+                    className={`w-full rounded-xl border px-3 py-2 text-center text-xs ${
                       qrisNotice.type === "success"
                         ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700"
                         : qrisNotice.type === "error"
@@ -854,7 +896,7 @@ export function TransactionForm() {
                         setQrisPaid(true);
                         setQrisNotice({ type: "success", message: "Pembayaran QRIS berhasil (lunas)." });
                       } else if (res.data.status === "pending") {
-                        setQrisNotice({ type: "info", message: "Pembayaran masih pending. Silakan coba cek lagi." });
+                        setQrisNotice({ type: "info", message: "Pembayaran belum diterima. Silakan scan ulang." });
                       } else if (res.data.status === "expired") {
                         setQrisNotice({ type: "error", message: "QRIS sudah kedaluwarsa." });
                       } else if (res.data.status === "failed") {
@@ -874,7 +916,7 @@ export function TransactionForm() {
                 {qrisPaid ? "Sudah Dibayar" : checkingQris ? "Mengecek..." : "Cek Status Pembayaran"}
               </button>
 
-              <div className="text-xs text-zinc-500">
+              <div className="text-center text-xs text-zinc-500">
                 Scan QR menggunakan aplikasi e-wallet atau mobile banking yang mendukung QRIS.
               </div>
             </div>
