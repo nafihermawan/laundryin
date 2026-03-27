@@ -59,6 +59,10 @@ export async function saveTransaction(
 
   const role = await getUserRole(supabase, user.id);
 
+  if (data.paymentMethod === "transfer" || data.paymentMethod === "qris_manual") {
+    return actionError("Metode pembayaran ini sedang dinonaktifkan");
+  }
+
   // 1b. Cek apakah kasir sudah buka shift (hanya jika role bukan admin)
   let shiftId: string | null = null;
   if (role !== "admin") {
@@ -148,12 +152,7 @@ export async function saveTransaction(
     // 3. Generate Order No (berdasarkan metode bayar)
     const dateStr = new Date().toISOString().slice(2, 10).replace(/-/g, "");
     const randStr = Math.random().toString(36).substring(2, 6).toUpperCase();
-    const prefix =
-      data.paymentMethod === "cash"
-        ? "CSH"
-        : data.paymentMethod === "transfer"
-          ? "TRF"
-          : "QRS";
+    const prefix = data.paymentMethod === "cash" ? "CSH" : "QRS";
     const orderNo = `${prefix}-${dateStr}-${randStr}`;
 
     // 4. Insert Order

@@ -152,22 +152,40 @@ export async function startQrisDynamicForOrder(orderId: string): Promise<ActionR
   if (itemsError) return actionError(itemsError.message);
   const total = (items ?? []).reduce((sum, it) => sum + Number(it.subtotal ?? 0), 0);
 
-  const { data: inserted, error: insertError } = await supabase
+  const { data: existingPending, error: pendingError } = await supabase
     .from("payments")
-    .insert({
-      order_id: orderId,
-      cash_register_id: shiftId,
-      paid_at: null,
-      amount: total,
-      method: "qris_dynamic",
-      status: "pending",
-      received_by: user.id,
-    })
     .select("id")
-    .single();
+    .eq("order_id", orderId)
+    .eq("status", "pending")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
-  if (insertError) return actionError(insertError.message);
-  const paymentId = inserted.id;
+  if (pendingError) return actionError(pendingError.message);
+
+  const pendingPaymentId = (existingPending as unknown as { id?: string } | null)?.id ?? null;
+
+  let paymentId: string;
+  if (pendingPaymentId) {
+    paymentId = pendingPaymentId;
+  } else {
+    const { data: inserted, error: insertError } = await supabase
+      .from("payments")
+      .insert({
+        order_id: orderId,
+        cash_register_id: shiftId,
+        paid_at: null,
+        amount: total,
+        method: "qris_dynamic",
+        status: "pending",
+        received_by: user.id,
+      })
+      .select("id")
+      .single();
+
+    if (insertError) return actionError(insertError.message);
+    paymentId = inserted.id;
+  }
 
   const notificationUrl = `${env.APP_BASE_URL.replace(/\/+$/, "")}/api/webhooks/midtrans`;
   const created = await createMidtransQrisCharge({
@@ -184,10 +202,14 @@ export async function startQrisDynamicForOrder(orderId: string): Promise<ActionR
       cash_register_id: shiftId,
       amount: total,
       method: "qris_dynamic",
+      status: "pending",
+      paid_at: null,
       provider: created.provider,
       provider_ref: created.providerRef,
       provider_status: created.providerStatus,
       provider_payload: created.raw as Json,
+      reference_no: null,
+      notes: null,
       qris_qr_string: created.qrString,
       qris_image_url: created.qrImageUrl,
       qris_expires_at: expiresAt,
@@ -279,6 +301,10 @@ export async function payOrder(orderId: string, input: PayOrderInput): Promise<A
   } = await supabase.auth.getUser();
 
   if (!user) return actionError("User tidak terautentikasi");
+
+  if (input.method !== "cash") {
+    return actionError("Metode pembayaran ini sedang dinonaktifkan");
+  }
 
   const { error } = await supabase.rpc("pay_order", {
     order_id: orderId,

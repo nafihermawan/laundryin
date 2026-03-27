@@ -47,7 +47,7 @@ export function TransactionActions({
   const [status, setStatus] = useState(getLaundryStatus(currentStatus));
   const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [payingOpen, setPayingOpen] = useState(false);
-  const [payMethod, setPayMethod] = useState<PayOrderInput["method"] | "qris_dynamic">("cash");
+  const [payMethod, setPayMethod] = useState<"cash" | "qris_dynamic">("cash");
   const [cashReceived, setCashReceived] = useState<string>("");
   const [referenceNo, setReferenceNo] = useState("");
   const [payNotes, setPayNotes] = useState("");
@@ -243,6 +243,18 @@ export function TransactionActions({
     if (isGeneratingQris) return;
     let cancelled = false;
     async function generate() {
+      if (existingQris?.status === "pending") {
+        setQrisPaid(false);
+        setQrisDynamic({
+          paymentId: existingQris.paymentId,
+          providerRef: existingQris.providerRef,
+          qrString: existingQris.qrString,
+          imageUrl: existingQris.imageUrl,
+          expiresAt: existingQris.expiresAt,
+        });
+        setQrisDynamicStatus(existingQris.status);
+        return;
+      }
       setIsGeneratingQris(true);
       try {
         const res = await startQrisDynamicForOrder(orderId);
@@ -262,7 +274,7 @@ export function TransactionActions({
     return () => {
       cancelled = true;
     };
-  }, [isGeneratingQris, orderId, payMethod, payingOpen, qrisDynamic, qrisPaid]);
+  }, [existingQris, isGeneratingQris, orderId, payMethod, payingOpen, qrisDynamic, qrisPaid]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -361,12 +373,10 @@ export function TransactionActions({
                 <div className="text-xs font-medium text-zinc-600">Metode</div>
                 <select
                   value={payMethod}
-                  onChange={(e) => setPayMethod(e.target.value as PayOrderInput["method"] | "qris_dynamic")}
+                  onChange={(e) => setPayMethod(e.target.value as "cash" | "qris_dynamic")}
                   className="h-10 rounded-xl border border-zinc-200 bg-white px-3 text-sm focus:border-sky-400 focus:outline-none focus:ring-4 focus:ring-sky-400/10"
                 >
                   <option value="cash">Cash</option>
-                  <option value="transfer">Transfer</option>
-                  <option value="qris_manual">QRIS Manual</option>
                   <option value="qris_dynamic">QRIS Dinamis</option>
                 </select>
               </div>
@@ -399,17 +409,7 @@ export function TransactionActions({
                       {qrisPaid ? "Lunas" : "Menunggu pembayaran"}
                     </div>
                   </div>
-                ) : (
-                  <div className="flex flex-col gap-1">
-                    <div className="text-xs font-medium text-zinc-600">No. Referensi (Opsional)</div>
-                    <input
-                      type="text"
-                      value={referenceNo}
-                      onChange={(e) => setReferenceNo(e.target.value)}
-                      className="h-10 rounded-xl border border-zinc-200 bg-white px-3 text-sm focus:border-sky-400 focus:outline-none focus:ring-4 focus:ring-sky-400/10"
-                    />
-                  </div>
-                )}
+                ) : null}
               </div>
 
               <div className="flex flex-col gap-1">

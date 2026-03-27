@@ -37,8 +37,6 @@ function formatIDR(value: number) {
 
 const paymentOptions = [
   { value: "cash", label: "Cash" },
-  { value: "transfer", label: "Transfer" },
-  { value: "qris_manual", label: "QRIS Manual" },
   { value: "qris_dynamic", label: "QRIS Dinamis" },
 ] as const;
 
