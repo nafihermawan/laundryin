@@ -319,7 +319,16 @@ export interface Database {
       [_ in never]: never;
     };
     Functions: {
-      [_ in never]: never;
+      pay_order: {
+        Args: {
+          order_id: string;
+          method: string;
+          cash_received: number | null;
+          reference_no: string | null;
+          notes: string | null;
+        };
+        Returns: undefined;
+      };
     };
     Enums: {
       [_ in never]: never;

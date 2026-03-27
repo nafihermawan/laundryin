@@ -6,6 +6,7 @@ import { ActionResponse, success, error as actionError } from "@/lib/action-resp
 import { env } from "@/lib/env";
 import { getUserRole } from "@/lib/auth/get-user-role";
 import { createMidtransQrisCharge } from "@/lib/payments/midtrans";
+import type { Json } from "@/lib/supabase/database.types";
 
 export async function updateOrderStatus(orderId: string, newStatus: string): Promise<ActionResponse> {
   const supabase = await createClient();
@@ -137,7 +138,7 @@ export async function startQrisDynamicForOrder(orderId: string): Promise<ActionR
       provider: created.provider,
       provider_ref: created.providerRef,
       provider_status: created.providerStatus,
-      provider_payload: created.raw,
+      provider_payload: created.raw as Json,
       qris_qr_string: created.qrString,
       qris_expires_at: expiresAt,
     })

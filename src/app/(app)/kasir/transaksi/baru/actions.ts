@@ -6,6 +6,7 @@ import { success as actionSuccess, error as actionError, type ActionResponse } f
 import { getUserRole } from "@/lib/auth/get-user-role";
 import { env } from "@/lib/env";
 import { createMidtransQrisCharge } from "@/lib/payments/midtrans";
+import type { Json } from "@/lib/supabase/database.types";
 
 export type TransactionData = {
   customer: {
@@ -248,7 +249,7 @@ export async function saveTransaction(
           provider: created.provider,
           provider_ref: created.providerRef,
           provider_status: created.providerStatus,
-          provider_payload: created.raw,
+          provider_payload: created.raw as Json,
           qris_qr_string: created.qrString,
           qris_expires_at: expiresAt,
         })

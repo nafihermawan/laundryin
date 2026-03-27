@@ -126,6 +126,7 @@ export function TransactionActions({
 
   useEffect(() => {
     if (!qrisDynamic) return;
+    const paymentId = qrisDynamic.paymentId;
     const supabase = createClient();
     let cancelled = false;
 
@@ -133,7 +134,7 @@ export function TransactionActions({
       const { data } = await supabase
         .from("payments")
         .select("status")
-        .eq("id", qrisDynamic.paymentId)
+        .eq("id", paymentId)
         .maybeSingle();
       if (cancelled) return;
       if (data?.status === "paid") setQrisPaid(true);
@@ -142,14 +143,14 @@ export function TransactionActions({
     fetchCurrent();
 
     const channel = supabase
-      .channel(`payments:${qrisDynamic.paymentId}`)
+      .channel(`payments:${paymentId}`)
       .on(
         "postgres_changes",
         {
           event: "UPDATE",
           schema: "public",
           table: "payments",
-          filter: `id=eq.${qrisDynamic.paymentId}`,
+          filter: `id=eq.${paymentId}`,
         },
         (payload: unknown) => {
           const nextStatus = (payload as { new?: { status?: unknown } })?.new?.status;

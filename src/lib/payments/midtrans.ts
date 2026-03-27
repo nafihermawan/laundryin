@@ -87,17 +87,14 @@ export async function createMidtransQrisCharge(
   };
 }
 
-export function verifyMidtransSignature(payload: {
-  order_id?: unknown;
-  status_code?: unknown;
-  gross_amount?: unknown;
-  signature_key?: unknown;
-}) {
+export function verifyMidtransSignature(payload: unknown) {
   if (!env.MIDTRANS_SERVER_KEY) return false;
-  const orderId = typeof payload.order_id === "string" ? payload.order_id : "";
-  const statusCode = typeof payload.status_code === "string" ? payload.status_code : "";
-  const grossAmount = typeof payload.gross_amount === "string" ? payload.gross_amount : "";
-  const signatureKey = typeof payload.signature_key === "string" ? payload.signature_key : "";
+  const obj = typeof payload === "object" && payload !== null ? (payload as Record<string, unknown>) : {};
+
+  const orderId = typeof obj.order_id === "string" ? obj.order_id : "";
+  const statusCode = typeof obj.status_code === "string" ? obj.status_code : "";
+  const grossAmount = typeof obj.gross_amount === "string" ? obj.gross_amount : "";
+  const signatureKey = typeof obj.signature_key === "string" ? obj.signature_key : "";
   if (!orderId || !statusCode || !grossAmount || !signatureKey) return false;
 
   const computed = crypto
@@ -107,4 +104,3 @@ export function verifyMidtransSignature(payload: {
 
   return computed === signatureKey;
 }
-
