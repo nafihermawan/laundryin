@@ -282,8 +282,9 @@ export function TransactionForm() {
   }
 
   const origin = typeof window !== "undefined" ? window.location.origin : "";
-  const simulatorImageUrl =
-    qrisDynamic && origin ? `${origin}/v2/qris/${qrisDynamic.providerRef}/qr-code` : null;
+  const simulatorImageUrl = qrisDynamic?.imageUrl ?? null;
+  const publicImageUrl =
+    qrisDynamic && origin ? `${origin}/api/qris/${qrisDynamic.paymentId}/qr` : null;
 
   return (
     <div className="relative pb-24 lg:pb-0">
@@ -799,6 +800,32 @@ export function TransactionForm() {
                       onClick={async () => {
                         try {
                           const url = simulatorImageUrl;
+                          if (!url) return;
+                          await navigator.clipboard.writeText(url);
+                        } catch {}
+                      }}
+                      className="inline-flex h-10 shrink-0 items-center justify-center rounded-xl border border-zinc-200 bg-white px-3 text-xs font-semibold text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+
+              {publicImageUrl ? (
+                <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
+                  <div className="text-xs font-medium text-zinc-600">Public QR Image URL</div>
+                  <div className="mt-2 flex items-center gap-2">
+                    <input
+                      value={publicImageUrl}
+                      readOnly
+                      className="h-10 w-full rounded-xl border border-zinc-200 bg-white px-3 text-xs text-zinc-700 outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          const url = publicImageUrl;
                           if (!url) return;
                           await navigator.clipboard.writeText(url);
                         } catch {}

@@ -348,18 +348,44 @@ export function TransactionActions({
                           Kedaluwarsa: {new Date(qrisDynamic.expiresAt).toLocaleString("id-ID")}
                         </div>
                       ) : null}
-                      {origin ? (
+                      {qrisDynamic.imageUrl ? (
                         <div className="w-full rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
                           <div className="text-xs font-medium text-zinc-600">QR Code Image URL (Sandbox Simulator)</div>
                           <div className="mt-2 flex items-center gap-2">
-                            {(() => {
-                              const url = `${origin}/v2/qris/${qrisDynamic.providerRef}/qr-code`;
-                              return (
                             <input
-                              value={url}
+                              value={qrisDynamic.imageUrl}
                               readOnly
                               className="h-10 w-full rounded-xl border border-zinc-200 bg-white px-3 text-xs text-zinc-700 outline-none"
                             />
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                try {
+                                  const url = qrisDynamic.imageUrl;
+                                  if (!url) return;
+                                  await navigator.clipboard.writeText(url);
+                                } catch {}
+                              }}
+                              className="inline-flex h-10 shrink-0 items-center justify-center rounded-xl border border-zinc-200 bg-white px-3 text-xs font-semibold text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
+                            >
+                              Copy
+                            </button>
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {origin ? (
+                        <div className="w-full rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
+                          <div className="text-xs font-medium text-zinc-600">Public QR Image URL</div>
+                          <div className="mt-2 flex items-center gap-2">
+                            {(() => {
+                              const url = `${origin}/api/qris/${qrisDynamic.paymentId}/qr`;
+                              return (
+                                <input
+                                  value={url}
+                                  readOnly
+                                  className="h-10 w-full rounded-xl border border-zinc-200 bg-white px-3 text-xs text-zinc-700 outline-none"
+                                />
                               );
                             })()}
                             <button
@@ -368,7 +394,7 @@ export function TransactionActions({
                                 try {
                                   if (!origin) return;
                                   await navigator.clipboard.writeText(
-                                    `${origin}/v2/qris/${qrisDynamic.providerRef}/qr-code`,
+                                    `${origin}/api/qris/${qrisDynamic.paymentId}/qr`,
                                   );
                                 } catch {}
                               }}
