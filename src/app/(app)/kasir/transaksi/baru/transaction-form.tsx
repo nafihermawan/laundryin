@@ -804,7 +804,7 @@ export function TransactionForm() {
         >
           <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white shadow-xl">
             <div className="flex flex-col gap-1 border-b border-zinc-100 p-5 text-center">
-                <div className="text-sm font-semibold text-zinc-900">QRIS Dinamis</div>
+                <div className="text-sm font-semibold text-zinc-900">QRIS</div>
                 <div className="text-xs text-zinc-500">{qrisDynamic.orderNo}</div>
             </div>
 
