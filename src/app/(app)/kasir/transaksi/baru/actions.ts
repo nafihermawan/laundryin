@@ -11,7 +11,7 @@ import type { Json } from "@/lib/supabase/database.types";
 export type TransactionData = {
   customer: {
     name: string;
-    phone?: string;
+    phone: string;
     notes?: string;
   };
   items: Array<{
@@ -61,6 +61,10 @@ export async function saveTransaction(
 
   if (data.paymentMethod === "transfer" || data.paymentMethod === "qris_manual") {
     return actionError("Metode pembayaran ini sedang dinonaktifkan");
+  }
+
+  if (!data.customer.phone.trim()) {
+    return actionError("No. HP wajib diisi");
   }
 
   // 1b. Cek apakah kasir sudah buka shift (hanya jika role bukan admin)
@@ -123,13 +127,14 @@ export async function saveTransaction(
 
     // 2. Cari atau buat customer
     let customerId: string;
+    const phone = data.customer.phone.trim();
     
     // Cek dulu apakah ada customer dengan nama & phone yang sama
     const { data: existingCustomer } = await supabase
       .from("customers")
       .select("id")
       .eq("name", data.customer.name)
-      .eq("phone", data.customer.phone || "")
+      .eq("phone", phone)
       .maybeSingle();
 
     if (existingCustomer) {
@@ -139,7 +144,7 @@ export async function saveTransaction(
         .from("customers")
         .insert({
           name: data.customer.name,
-          phone: data.customer.phone || "",
+          phone,
           notes: data.customer.notes || "",
         })
         .select("id")

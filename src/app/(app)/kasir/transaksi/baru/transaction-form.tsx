@@ -100,6 +100,7 @@ export function TransactionForm() {
 
   const canSubmit = useMemo(() => {
     if (!customerName.trim()) return false;
+    if (!customerPhone.trim()) return false;
     if (items.length === 0) return false;
     if (!items.some((it) => it.serviceName.trim() && it.qty > 0)) return false;
     if (paymentMethod === "cash") {
@@ -108,7 +109,7 @@ export function TransactionForm() {
       if (received < summary.total) return false;
     }
     return true;
-  }, [cashReceived, customerName, items, paymentMethod, summary.total]);
+  }, [cashReceived, customerName, customerPhone, items, paymentMethod, summary.total]);
 
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -252,6 +253,10 @@ export function TransactionForm() {
       setSaveError("Nama pelanggan wajib diisi");
       return;
     }
+    if (!customerPhone.trim()) {
+      setSaveError("No. HP wajib diisi");
+      return;
+    }
 
     const validItems = items.filter((it) => it.serviceName.trim() && it.qty > 0);
     if (validItems.length === 0) {
@@ -278,7 +283,7 @@ export function TransactionForm() {
     const result = await saveTransaction({
       customer: {
         name: customerName,
-        phone: customerPhone,
+        phone: customerPhone.trim(),
         notes: customerNote,
       },
       items: validItems.map((it) => ({
@@ -407,7 +412,7 @@ export function TransactionForm() {
             <div className="flex items-center justify-between gap-4">
               <h2 className="text-base font-semibold tracking-tight">Pelanggan</h2>
               <div className="text-xs text-zinc-500">
-                Wajib isi nama pelanggan
+                Wajib isi nama dan no. HP
               </div>
             </div>
 
@@ -431,6 +436,7 @@ export function TransactionForm() {
                   inputMode="tel"
                   placeholder="08xxxxxxxxxx"
                   className="h-11 rounded-xl border border-zinc-200 bg-white px-4 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-sky-400/70 focus:ring-4 focus:ring-sky-400/10"
+                  required
                 />
               </label>
             </div>
