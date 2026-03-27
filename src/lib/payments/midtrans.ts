@@ -68,9 +68,6 @@ export async function createMidtransQrisCharge(
   if (isProd && env.MIDTRANS_SERVER_KEY.startsWith("SB-")) {
     throw new Error("Konfigurasi Midtrans tidak valid: MIDTRANS_IS_PRODUCTION=true tapi MIDTRANS_SERVER_KEY sandbox");
   }
-  if (!isProd && !env.MIDTRANS_SERVER_KEY.startsWith("SB-")) {
-    throw new Error("Konfigurasi Midtrans tidak valid: MIDTRANS_IS_PRODUCTION!=true tapi MIDTRANS_SERVER_KEY bukan sandbox");
-  }
 
   const amountInt = Math.round(input.grossAmount);
   if (!Number.isFinite(amountInt) || amountInt <= 0) {
