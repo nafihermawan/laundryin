@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { checkQrisDynamicPaymentStatus, saveTransaction } from "./actions";
+import { saveTransaction } from "./actions";
 import { createClient } from "@/lib/supabase/browser";
 import { QRCodeCanvas } from "qrcode.react";
 
@@ -840,7 +840,15 @@ export function TransactionForm() {
                   setSaveSuccess(null);
                   setQrisNotice(null);
                   try {
-                    const res = await checkQrisDynamicPaymentStatus(qrisDynamic.paymentId);
+                    const httpRes = await fetch(`/api/qris/${qrisDynamic.paymentId}/status`, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      cache: "no-store",
+                    });
+                    const res = (await httpRes.json()) as
+                      | { success: true; data: { status: string; providerStatus: string | null } }
+                      | { success: false; error: string };
+
                     if (res.success) {
                       if (res.data.status === "paid") {
                         setQrisPaid(true);
