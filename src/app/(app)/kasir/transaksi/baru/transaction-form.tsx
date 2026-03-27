@@ -659,13 +659,22 @@ export function TransactionForm() {
             <div className="flex flex-col gap-2">
               <span className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Layanan Terpilih</span>
               <div className="flex flex-col gap-1.5">
-                {items.filter(it => it.serviceName.trim()).length > 0 ? (
-                  items.filter(it => it.serviceName.trim()).map((it) => (
-                    <div key={it.id} className="flex items-center justify-between gap-2">
-                      <span className="text-zinc-700 truncate">{it.serviceName}</span>
-                      <span className="font-medium text-zinc-900 shrink-0">{it.qty} {it.unit}</span>
-                    </div>
-                  ))
+                {items.some((it) => it.serviceName.trim()) ? (
+                  items.map((it, idx) => {
+                    if (!it.serviceName.trim()) return null;
+                    const lineTotal = summary.lineTotals[idx] ?? 0;
+                    return (
+                      <div key={it.id} className="flex items-start justify-between gap-3">
+                        <span className="min-w-0 truncate text-zinc-700">{it.serviceName}</span>
+                        <div className="shrink-0 text-right">
+                          <div className="text-xs font-medium text-zinc-500">
+                            {it.qty} {it.unit}
+                          </div>
+                          <div className="font-medium text-zinc-900">{formatIDR(lineTotal)}</div>
+                        </div>
+                      </div>
+                    );
+                  })
                 ) : (
                   <span className="text-zinc-400 italic text-xs">Belum ada layanan</span>
                 )}
