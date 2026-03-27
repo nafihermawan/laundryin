@@ -39,6 +39,53 @@ export type StartQrisDynamicOutput = {
   expiresAt: string | null;
 };
 
+export type ExistingQrisDynamicOutput = {
+  paymentId: string;
+  providerRef: string;
+  qrString: string;
+  imageUrl: string | null;
+  expiresAt: string | null;
+  status: string;
+};
+
+export async function getExistingQrisDynamicForOrder(
+  orderId: string,
+): Promise<ActionResponse<ExistingQrisDynamicOutput | null>> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return actionError("User tidak terautentikasi");
+
+  const { data, error } = await supabase
+    .from("payments")
+    .select("id, status, provider_ref, qris_qr_string, qris_image_url, qris_expires_at")
+    .eq("order_id", orderId)
+    .eq("method", "qris_dynamic")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) return actionError(error.message || "Gagal memuat data QRIS dinamis");
+  if (!data) return success(null);
+
+  const paymentId = data.id;
+  const qrString = data.qris_qr_string;
+  const providerRef = data.provider_ref;
+  if (!paymentId || typeof qrString !== "string" || !qrString) return success(null);
+
+  return success({
+    paymentId,
+    providerRef: typeof providerRef === "string" ? providerRef : "",
+    qrString,
+    imageUrl: typeof data.qris_image_url === "string" ? data.qris_image_url : null,
+    expiresAt: typeof data.qris_expires_at === "string" ? data.qris_expires_at : null,
+    status: typeof data.status === "string" ? data.status : "pending",
+  });
+}
+
 export async function startQrisDynamicForOrder(orderId: string): Promise<ActionResponse<StartQrisDynamicOutput>> {
   const supabase = await createClient();
 

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import {
   checkQrisDynamicPaymentStatus,
+  getExistingQrisDynamicForOrder,
   payOrder,
   startQrisDynamicForOrder,
   updateOrderStatus,
@@ -53,6 +54,14 @@ export function TransactionActions({
   const [isPaying, setIsPaying] = useState(false);
   const [isGeneratingQris, setIsGeneratingQris] = useState(false);
   const [isCheckingQris, setIsCheckingQris] = useState(false);
+  const [existingQris, setExistingQris] = useState<{
+    paymentId: string;
+    providerRef: string;
+    qrString: string;
+    imageUrl: string | null;
+    expiresAt: string | null;
+    status: string;
+  } | null>(null);
   const [qrisDynamic, setQrisDynamic] = useState<{
     paymentId: string;
     providerRef: string;
@@ -61,15 +70,28 @@ export function TransactionActions({
     expiresAt: string | null;
   } | null>(null);
   const [qrisPaid, setQrisPaid] = useState(false);
-  const [origin, setOrigin] = useState("");
 
   useEffect(() => {
     setStatus(getLaundryStatus(currentStatus));
   }, [currentStatus]);
 
   useEffect(() => {
-    setOrigin(window.location.origin);
-  }, []);
+    let cancelled = false;
+    async function fetchExisting() {
+      if (isPaid) return;
+      const res = await getExistingQrisDynamicForOrder(orderId);
+      if (cancelled) return;
+      if (res.success) {
+        setExistingQris(res.data);
+        return;
+      }
+      setExistingQris(null);
+    }
+    fetchExisting();
+    return () => {
+      cancelled = true;
+    };
+  }, [isPaid, orderId]);
 
   useEffect(() => {
     if (!toast) return;
@@ -84,6 +106,24 @@ export function TransactionActions({
     setReferenceNo("");
     setPayNotes("");
     setQrisDynamic(null);
+    setQrisPaid(false);
+  }
+
+  function openResumeQris() {
+    if (!existingQris) return;
+    if (existingQris.status !== "pending") return;
+    setPayingOpen(true);
+    setPayMethod("qris_dynamic");
+    setCashReceived(total > 0 ? String(total) : "");
+    setReferenceNo("");
+    setPayNotes("");
+    setQrisDynamic({
+      paymentId: existingQris.paymentId,
+      providerRef: existingQris.providerRef,
+      qrString: existingQris.qrString,
+      imageUrl: existingQris.imageUrl,
+      expiresAt: existingQris.expiresAt,
+    });
     setQrisPaid(false);
   }
 
@@ -222,13 +262,24 @@ export function TransactionActions({
           </div>
         </div>
         {!isPaid ? (
-          <button
-            type="button"
-            onClick={openPayModal}
-            className="inline-flex h-10 items-center justify-center rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white transition hover:bg-emerald-700"
-          >
-            Bayar
-          </button>
+          <div className="flex items-center gap-2">
+            {existingQris?.status === "pending" ? (
+              <button
+                type="button"
+                onClick={openResumeQris}
+                className="inline-flex h-10 items-center justify-center rounded-xl bg-zinc-900 px-4 text-sm font-semibold text-white transition hover:bg-zinc-800"
+              >
+                Lanjutkan QRIS
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={openPayModal}
+              className="inline-flex h-10 items-center justify-center rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white transition hover:bg-emerald-700"
+            >
+              Bayar
+            </button>
+          </div>
         ) : null}
       </div>
 
@@ -414,37 +465,6 @@ export function TransactionActions({
                         </div>
                       ) : null}
 
-                      {origin ? (
-                        <div className="w-full rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
-                          <div className="text-xs font-medium text-zinc-600">Public QR Image URL</div>
-                          <div className="mt-2 flex items-center gap-2">
-                            {(() => {
-                              const url = `${origin}/api/qris/${qrisDynamic.paymentId}/qr`;
-                              return (
-                                <input
-                                  value={url}
-                                  readOnly
-                                  className="h-10 w-full rounded-xl border border-zinc-200 bg-white px-3 text-xs text-zinc-700 outline-none"
-                                />
-                              );
-                            })()}
-                            <button
-                              type="button"
-                              onClick={async () => {
-                                try {
-                                  if (!origin) return;
-                                  await navigator.clipboard.writeText(
-                                    `${origin}/api/qris/${qrisDynamic.paymentId}/qr`,
-                                  );
-                                } catch {}
-                              }}
-                              className="inline-flex h-10 shrink-0 items-center justify-center rounded-xl border border-zinc-200 bg-white px-3 text-xs font-semibold text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
-                            >
-                              Copy
-                            </button>
-                          </div>
-                        </div>
-                      ) : null}
                     </>
                   ) : (
                     <div className="text-xs text-zinc-500">
