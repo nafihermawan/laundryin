@@ -213,6 +213,17 @@ export function TransactionForm() {
     };
   }, [qrisDynamic]);
 
+  useEffect(() => {
+    if (!qrisDynamic) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key !== "Escape") return;
+      setQrisDynamic(null);
+      setQrisNotice(null);
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [qrisDynamic]);
+
   function resetFormInputs() {
     setCustomerName("");
     setCustomerPhone("");
@@ -782,27 +793,19 @@ export function TransactionForm() {
       </div>
 
       {qrisDynamic ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) {
+              setQrisDynamic(null);
+              setQrisNotice(null);
+            }
+          }}
+        >
           <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white shadow-xl">
-            <div className="flex items-start justify-between gap-4 border-b border-zinc-100 p-5">
-              <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-1 border-b border-zinc-100 p-5 text-center">
                 <div className="text-sm font-semibold text-zinc-900">QRIS Dinamis</div>
                 <div className="text-xs text-zinc-500">{qrisDynamic.orderNo}</div>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setQrisDynamic(null);
-                  setQrisNotice(null);
-                }}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-zinc-200 text-zinc-600 transition hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
-                aria-label="Tutup"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M18 6 6 18" />
-                  <path d="M6 6l12 12" />
-                </svg>
-              </button>
             </div>
 
             <div className="flex flex-col gap-4 p-5">
@@ -817,18 +820,9 @@ export function TransactionForm() {
                 >
                   {qrisPaid ? "Lunas" : "Menunggu Pembayaran"}
                 </div>
-                {qrisCountdown && qrisDynamic.expiresAt ? (
-                  <div className="text-xs text-zinc-500">
-                    <div className={qrisCountdown.remainingMs <= 0 && !qrisPaid ? "font-semibold text-red-600" : undefined}>
-                      {qrisCountdown.remainingMs <= 0 ? "QRIS kedaluwarsa" : `Kedaluwarsa dalam ${qrisCountdown.timeLeft}`}
-                    </div>
-                    <div className="mt-0.5">
-                      {new Date(qrisDynamic.expiresAt).toLocaleString("id-ID")}
-                    </div>
-                  </div>
-                ) : qrisDynamic.expiresAt ? (
-                  <div className="text-xs text-zinc-500">
-                    Kedaluwarsa: {new Date(qrisDynamic.expiresAt).toLocaleString("id-ID")}
+                {qrisCountdown ? (
+                  <div className={`text-xs ${qrisCountdown.remainingMs <= 0 && !qrisPaid ? "font-semibold text-red-600" : "text-zinc-500"}`}>
+                    {qrisCountdown.remainingMs <= 0 ? "QRIS kedaluwarsa" : `Kedaluwarsa dalam ${qrisCountdown.timeLeft}`}
                   </div>
                 ) : null}
 
@@ -921,8 +915,6 @@ export function TransactionForm() {
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 border-t border-zinc-100 p-5">
-            </div>
           </div>
         </div>
       ) : null}
