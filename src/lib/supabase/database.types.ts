@@ -203,6 +203,7 @@ export interface Database {
           provider_ref: string | null;
           provider_status: string | null;
           qris_expires_at: string | null;
+          qris_image_url: string | null;
           qris_qr_string: string | null;
           received_by: string | null;
           reference_no: string | null;
@@ -222,6 +223,7 @@ export interface Database {
           provider_ref?: string | null;
           provider_status?: string | null;
           qris_expires_at?: string | null;
+          qris_image_url?: string | null;
           qris_qr_string?: string | null;
           received_by?: string | null;
           reference_no?: string | null;
@@ -241,6 +243,7 @@ export interface Database {
           provider_ref?: string | null;
           provider_status?: string | null;
           qris_expires_at?: string | null;
+          qris_image_url?: string | null;
           qris_qr_string?: string | null;
           received_by?: string | null;
           reference_no?: string | null;

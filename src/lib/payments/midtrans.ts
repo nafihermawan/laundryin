@@ -25,6 +25,7 @@ export type CreateMidtransQrisChargeResult = {
   providerRef: string;
   providerStatus: string;
   qrString: string;
+  qrImageUrl: string | null;
   raw: unknown;
 };
 
@@ -78,11 +79,15 @@ export async function createMidtransQrisCharge(
     throw new Error("Midtrans tidak mengembalikan qr_string");
   }
 
+  const qrImageUrl =
+    data.actions?.find((a) => typeof a?.url === "string" && a.url.startsWith("http"))?.url ?? null;
+
   return {
     provider: "midtrans",
     providerRef: data.transaction_id,
     providerStatus: data.transaction_status,
     qrString,
+    qrImageUrl,
     raw: data,
   };
 }

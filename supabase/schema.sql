@@ -424,6 +424,7 @@ alter table public.payments
   add column if not exists provider_status text,
   add column if not exists provider_payload jsonb,
   add column if not exists qris_qr_string text,
+  add column if not exists qris_image_url text,
   add column if not exists qris_expires_at timestamptz;
 
 create index if not exists payments_order_id_created_at_idx on public.payments(order_id, created_at desc);

@@ -46,9 +46,12 @@ export function TransactionActions({
   const [payNotes, setPayNotes] = useState("");
   const [isPaying, setIsPaying] = useState(false);
   const [isGeneratingQris, setIsGeneratingQris] = useState(false);
-  const [qrisDynamic, setQrisDynamic] = useState<{ paymentId: string; qrString: string; expiresAt: string | null } | null>(
-    null,
-  );
+  const [qrisDynamic, setQrisDynamic] = useState<{
+    paymentId: string;
+    qrString: string;
+    imageUrl: string | null;
+    expiresAt: string | null;
+  } | null>(null);
   const [qrisPaid, setQrisPaid] = useState(false);
 
   useEffect(() => {
@@ -337,6 +340,31 @@ export function TransactionActions({
                       {qrisDynamic.expiresAt ? (
                         <div className="text-xs text-zinc-500">
                           Kedaluwarsa: {new Date(qrisDynamic.expiresAt).toLocaleString("id-ID")}
+                        </div>
+                      ) : null}
+                      {qrisDynamic.imageUrl ? (
+                        <div className="w-full rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
+                          <div className="text-xs font-medium text-zinc-600">QR Code Image URL (Sandbox Simulator)</div>
+                          <div className="mt-2 flex items-center gap-2">
+                            <input
+                              value={qrisDynamic.imageUrl}
+                              readOnly
+                              className="h-10 w-full rounded-xl border border-zinc-200 bg-white px-3 text-xs text-zinc-700 outline-none"
+                            />
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                try {
+                                  const url = qrisDynamic.imageUrl;
+                                  if (!url) return;
+                                  await navigator.clipboard.writeText(url);
+                                } catch {}
+                              }}
+                              className="inline-flex h-10 shrink-0 items-center justify-center rounded-xl border border-zinc-200 bg-white px-3 text-xs font-semibold text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
+                            >
+                              Copy
+                            </button>
+                          </div>
                         </div>
                       ) : null}
                     </>

@@ -66,11 +66,9 @@ export function TransactionForm() {
   const [customerNote, setCustomerNote] = useState("");
   const [receivedAt, setReceivedAt] = useState("");
 
-  // Update receivedAt every minute so it reflects current time
   useEffect(() => {
     const updateTime = () => {
       const now = new Date();
-      // Adjust to local timezone format for datetime-local input
       const tzOffset = now.getTimezoneOffset() * 60000;
       const localISOTime = new Date(now.getTime() - tzOffset).toISOString().slice(0, 16);
       setReceivedAt(localISOTime);
@@ -83,7 +81,7 @@ export function TransactionForm() {
 
   const [dueAt, setDueAt] = useState(() => {
     const d = new Date();
-    d.setDate(d.getDate() + 2); // Default 2 hari
+    d.setDate(d.getDate() + 2);
     return d.toISOString().slice(0, 16);
   });
   const [paymentMethod, setPaymentMethod] = useState<
@@ -121,6 +119,7 @@ export function TransactionForm() {
     orderNo: string;
     paymentId: string;
     qrString: string;
+    imageUrl: string | null;
     expiresAt: string | null;
   } | null>(null);
   const [qrisPaid, setQrisPaid] = useState(false);
@@ -257,6 +256,7 @@ export function TransactionForm() {
           orderNo: result.data.orderNo,
           paymentId: result.data.qris.paymentId,
           qrString: result.data.qris.qrString,
+          imageUrl: result.data.qris.imageUrl,
           expiresAt: result.data.qris.expiresAt,
         });
         setSaveSuccess(`Transaksi ${result.data.orderNo} berhasil dibuat. Menunggu pembayaran QRIS.`);
@@ -271,7 +271,6 @@ export function TransactionForm() {
     }
   }
 
-  // Jika belum mounted, jangan render konten dinamis untuk menghindari hydration mismatch
   if (!mounted) {
     return (
       <div className="flex h-[400px] items-center justify-center rounded-2xl border border-zinc-200 bg-white shadow-sm">
@@ -779,6 +778,32 @@ export function TransactionForm() {
                   </div>
                 ) : null}
               </div>
+
+              {qrisDynamic.imageUrl ? (
+                <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
+                  <div className="text-xs font-medium text-zinc-600">QR Code Image URL (Sandbox Simulator)</div>
+                  <div className="mt-2 flex items-center gap-2">
+                    <input
+                      value={qrisDynamic.imageUrl}
+                      readOnly
+                      className="h-10 w-full rounded-xl border border-zinc-200 bg-white px-3 text-xs text-zinc-700 outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          const url = qrisDynamic.imageUrl;
+                          if (!url) return;
+                          await navigator.clipboard.writeText(url);
+                        } catch {}
+                      }}
+                      className="inline-flex h-10 shrink-0 items-center justify-center rounded-xl border border-zinc-200 bg-white px-3 text-xs font-semibold text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                </div>
+              ) : null}
 
               <div className="text-xs text-zinc-500">
                 Scan QR menggunakan aplikasi e-wallet atau mobile banking yang mendukung QRIS.

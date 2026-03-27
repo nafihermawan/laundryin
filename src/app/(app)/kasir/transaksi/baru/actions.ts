@@ -38,6 +38,7 @@ export async function saveTransaction(
           qris: {
             paymentId: string;
             qrString: string;
+          imageUrl: string | null;
             expiresAt: string | null;
           };
         }
@@ -88,9 +89,6 @@ export async function saveTransaction(
       return actionError("Item transaksi tidak valid");
     }
 
-    // Parse receivedAt to ensure it is valid, but use current server time to be safe with DB constraints
-    // Since UI now locks it to current time, we can just use new Date().toISOString()
-    // to guarantee it passes the 'no future date' constraint that was failing due to client/server clock skew
     const receivedAtTs = new Date();
     const isoReceivedAt = receivedAtTs.toISOString();
     const dueAtTs = new Date(data.dueAt);
@@ -251,6 +249,7 @@ export async function saveTransaction(
           provider_status: created.providerStatus,
           provider_payload: created.raw as Json,
           qris_qr_string: created.qrString,
+          qris_image_url: created.qrImageUrl,
           qris_expires_at: expiresAt,
         })
         .eq("id", createdPayment.id);
@@ -266,7 +265,7 @@ export async function saveTransaction(
 
       return actionSuccess({
         orderNo,
-        qris: { paymentId: createdPayment.id, qrString: created.qrString, expiresAt },
+        qris: { paymentId: createdPayment.id, qrString: created.qrString, imageUrl: created.qrImageUrl, expiresAt },
       });
     }
 

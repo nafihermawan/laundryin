@@ -34,6 +34,7 @@ export type PayOrderInput = {
 export type StartQrisDynamicOutput = {
   paymentId: string;
   qrString: string;
+  imageUrl: string | null;
   expiresAt: string | null;
 };
 
@@ -140,6 +141,7 @@ export async function startQrisDynamicForOrder(orderId: string): Promise<ActionR
       provider_status: created.providerStatus,
       provider_payload: created.raw as Json,
       qris_qr_string: created.qrString,
+      qris_image_url: created.qrImageUrl,
       qris_expires_at: expiresAt,
     })
     .eq("id", paymentId);
@@ -147,7 +149,7 @@ export async function startQrisDynamicForOrder(orderId: string): Promise<ActionR
   if (updateError) return actionError(updateError.message);
 
   revalidatePath("/kasir/riwayat");
-  return success({ paymentId, qrString: created.qrString, expiresAt });
+  return success({ paymentId, qrString: created.qrString, imageUrl: created.qrImageUrl, expiresAt });
 }
 
 export async function payOrder(orderId: string, input: PayOrderInput): Promise<ActionResponse> {
