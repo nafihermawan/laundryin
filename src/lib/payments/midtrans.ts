@@ -14,6 +14,17 @@ type MidtransQrisChargeResponse = {
   actions?: Array<{ name: string; method: string; url: string }>;
 };
 
+type MidtransTransactionStatusResponse = {
+  status_code: string;
+  status_message: string;
+  transaction_id?: string;
+  order_id?: string;
+  payment_type?: string;
+  gross_amount?: string;
+  transaction_status?: string;
+  fraud_status?: string;
+};
+
 export type CreateMidtransQrisChargeInput = {
   orderId: string;
   grossAmount: number;
@@ -121,6 +132,28 @@ export async function createMidtransQrisCharge(
     qrImageUrl,
     raw: data,
   };
+}
+
+export async function getMidtransTransactionStatus(orderId: string): Promise<MidtransTransactionStatusResponse> {
+  if (!env.MIDTRANS_SERVER_KEY) {
+    throw new Error("MIDTRANS_SERVER_KEY belum diset");
+  }
+  if (!orderId) throw new Error("orderId tidak valid");
+
+  const res = await fetch(`${getMidtransApiBase()}/v2/${encodeURIComponent(orderId)}/status`, {
+    method: "GET",
+    headers: {
+      Accept: "application/json",
+      Authorization: getBasicAuthHeader(env.MIDTRANS_SERVER_KEY),
+    },
+  });
+
+  const bodyText = await res.text();
+  if (!res.ok) {
+    throw new Error(formatMidtransErrorMessage(res.status, bodyText));
+  }
+
+  return JSON.parse(bodyText) as MidtransTransactionStatusResponse;
 }
 
 export function verifyMidtransSignature(payload: unknown) {

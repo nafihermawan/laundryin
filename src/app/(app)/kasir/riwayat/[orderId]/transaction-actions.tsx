@@ -3,7 +3,13 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { payOrder, startQrisDynamicForOrder, updateOrderStatus, type PayOrderInput } from "../actions";
+import {
+  checkQrisDynamicPaymentStatus,
+  payOrder,
+  startQrisDynamicForOrder,
+  updateOrderStatus,
+  type PayOrderInput,
+} from "../actions";
 import { createClient } from "@/lib/supabase/browser";
 import { QRCodeCanvas } from "qrcode.react";
 
@@ -46,6 +52,7 @@ export function TransactionActions({
   const [payNotes, setPayNotes] = useState("");
   const [isPaying, setIsPaying] = useState(false);
   const [isGeneratingQris, setIsGeneratingQris] = useState(false);
+  const [isCheckingQris, setIsCheckingQris] = useState(false);
   const [qrisDynamic, setQrisDynamic] = useState<{
     paymentId: string;
     providerRef: string;
@@ -371,6 +378,39 @@ export function TransactionActions({
                               Copy
                             </button>
                           </div>
+                          <button
+                            type="button"
+                            disabled={isCheckingQris || qrisPaid}
+                            onClick={async () => {
+                              if (!qrisDynamic) return;
+                              setIsCheckingQris(true);
+                              try {
+                                const res = await checkQrisDynamicPaymentStatus(qrisDynamic.paymentId);
+                                if (res.success) {
+                                  if (res.data.status === "paid") {
+                                    setQrisPaid(true);
+                                    setToast({ type: "success", message: "Pembayaran QRIS berhasil (lunas)." });
+                                  } else if (res.data.status === "pending") {
+                                    setToast({ type: "success", message: "Pembayaran masih pending. Silakan cek lagi." });
+                                  } else if (res.data.status === "expired") {
+                                    setToast({ type: "error", message: "QRIS sudah kedaluwarsa." });
+                                  } else if (res.data.status === "failed") {
+                                    setToast({ type: "error", message: "Pembayaran gagal/ditolak." });
+                                  } else {
+                                    setToast({ type: "success", message: `Status: ${res.data.status}` });
+                                  }
+                                  router.refresh();
+                                } else {
+                                  setToast({ type: "error", message: res.error || "Gagal cek status pembayaran." });
+                                }
+                              } finally {
+                                setIsCheckingQris(false);
+                              }
+                            }}
+                            className="mt-2 inline-flex h-10 w-full items-center justify-center rounded-xl bg-zinc-900 px-4 text-xs font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-400"
+                          >
+                            {qrisPaid ? "Sudah Dibayar" : isCheckingQris ? "Mengecek..." : "Cek Status Pembayaran"}
+                          </button>
                         </div>
                       ) : null}
 

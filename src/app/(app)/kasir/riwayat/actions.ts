@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { ActionResponse, success, error as actionError } from "@/lib/action-response";
 import { env } from "@/lib/env";
 import { getUserRole } from "@/lib/auth/get-user-role";
-import { createMidtransQrisCharge } from "@/lib/payments/midtrans";
+import { createMidtransQrisCharge, getMidtransTransactionStatus } from "@/lib/payments/midtrans";
 import type { Json } from "@/lib/supabase/database.types";
 
 export async function updateOrderStatus(orderId: string, newStatus: string): Promise<ActionResponse> {
@@ -157,6 +157,71 @@ export async function startQrisDynamicForOrder(orderId: string): Promise<ActionR
     imageUrl: created.qrImageUrl,
     expiresAt,
   });
+}
+
+export async function checkQrisDynamicPaymentStatus(
+  paymentId: string,
+): Promise<ActionResponse<{ status: string; providerStatus: string | null }>> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return actionError("User tidak terautentikasi");
+
+  const { data: payment, error } = await supabase
+    .from("payments")
+    .select("id, method, status, provider")
+    .eq("id", paymentId)
+    .maybeSingle();
+
+  if (error) return actionError(error.message || "Gagal mengambil data pembayaran");
+  if (!payment) return actionError("Pembayaran tidak ditemukan");
+  if (payment.method !== "qris_dynamic") return actionError("Metode pembayaran bukan QRIS dinamis");
+  if (payment.provider !== "midtrans") return actionError("Provider pembayaran bukan Midtrans");
+
+  const data = await getMidtransTransactionStatus(paymentId);
+  const transactionStatus = typeof data.transaction_status === "string" ? data.transaction_status : null;
+  const fraudStatus = typeof data.fraud_status === "string" ? data.fraud_status : null;
+  const transactionId = typeof data.transaction_id === "string" ? data.transaction_id : null;
+
+  const shouldMarkPaid =
+    transactionStatus === "settlement" && (fraudStatus === "accept" || fraudStatus === null);
+
+  const nextStatus =
+    shouldMarkPaid
+      ? "paid"
+      : transactionStatus === "expire"
+        ? "expired"
+        : transactionStatus === "cancel" || transactionStatus === "deny"
+          ? "failed"
+          : "pending";
+
+  const updatePayload: Record<string, unknown> = {
+    provider: "midtrans",
+    provider_ref: transactionId,
+    provider_status: transactionStatus,
+    provider_payload: data as Json,
+    reference_no: transactionId,
+  };
+
+  if (nextStatus === "paid") {
+    updatePayload.status = "paid";
+    updatePayload.paid_at = new Date().toISOString();
+  } else if (nextStatus === "expired" || nextStatus === "failed") {
+    updatePayload.status = nextStatus;
+    updatePayload.paid_at = null;
+  }
+
+  const { error: updateError } = await supabase.from("payments").update(updatePayload).eq("id", paymentId);
+  if (updateError) return actionError(updateError.message || "Gagal memperbarui status pembayaran");
+
+  try {
+    revalidatePath("/kasir/riwayat");
+  } catch {}
+
+  return success({ status: nextStatus, providerStatus: transactionStatus });
 }
 
 export async function payOrder(orderId: string, input: PayOrderInput): Promise<ActionResponse> {
