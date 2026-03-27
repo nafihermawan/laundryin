@@ -191,36 +191,57 @@ export interface Database {
       payments: {
         Row: {
           amount: number;
+          cash_register_id: string | null;
           created_at: string;
           id: string;
           method: string;
           notes: string | null;
           order_id: string;
           paid_at: string | null;
+          provider: string | null;
+          provider_payload: Json | null;
+          provider_ref: string | null;
+          provider_status: string | null;
+          qris_expires_at: string | null;
+          qris_qr_string: string | null;
           received_by: string | null;
           reference_no: string | null;
           status: string;
         };
         Insert: {
           amount?: number;
+          cash_register_id?: string | null;
           created_at?: string;
           id?: string;
           method?: string;
           notes?: string | null;
           order_id: string;
           paid_at?: string | null;
+          provider?: string | null;
+          provider_payload?: Json | null;
+          provider_ref?: string | null;
+          provider_status?: string | null;
+          qris_expires_at?: string | null;
+          qris_qr_string?: string | null;
           received_by?: string | null;
           reference_no?: string | null;
           status?: string;
         };
         Update: {
           amount?: number;
+          cash_register_id?: string | null;
           created_at?: string;
           id?: string;
           method?: string;
           notes?: string | null;
           order_id?: string;
           paid_at?: string | null;
+          provider?: string | null;
+          provider_payload?: Json | null;
+          provider_ref?: string | null;
+          provider_status?: string | null;
+          qris_expires_at?: string | null;
+          qris_qr_string?: string | null;
           received_by?: string | null;
           reference_no?: string | null;
           status?: string;
@@ -231,6 +252,13 @@ export interface Database {
             columns: ["order_id"];
             isOneToOne: false;
             referencedRelation: "orders";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "payments_cash_register_id_fkey";
+            columns: ["cash_register_id"];
+            isOneToOne: false;
+            referencedRelation: "cash_registers";
             referencedColumns: ["id"];
           },
         ];

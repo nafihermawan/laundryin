@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { saveTransaction } from "./actions";
 import { createClient } from "@/lib/supabase/browser";
+import { QRCodeCanvas } from "qrcode.react";
 
 type Unit = "kg" | "pcs";
 
@@ -38,6 +39,7 @@ const paymentOptions = [
   { value: "cash", label: "Cash" },
   { value: "transfer", label: "Transfer" },
   { value: "qris_manual", label: "QRIS Manual" },
+  { value: "qris_dynamic", label: "QRIS Dinamis" },
 ] as const;
 
 export function TransactionForm() {
@@ -62,9 +64,23 @@ export function TransactionForm() {
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerNote, setCustomerNote] = useState("");
-  const [receivedAt, setReceivedAt] = useState(() =>
-    new Date().toISOString().slice(0, 16)
-  );
+  const [receivedAt, setReceivedAt] = useState("");
+
+  // Update receivedAt every minute so it reflects current time
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      // Adjust to local timezone format for datetime-local input
+      const tzOffset = now.getTimezoneOffset() * 60000;
+      const localISOTime = new Date(now.getTime() - tzOffset).toISOString().slice(0, 16);
+      setReceivedAt(localISOTime);
+    };
+    
+    updateTime();
+    const interval = setInterval(updateTime, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
   const [dueAt, setDueAt] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() + 2); // Default 2 hari
@@ -101,6 +117,13 @@ export function TransactionForm() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
+  const [qrisDynamic, setQrisDynamic] = useState<{
+    orderNo: string;
+    paymentId: string;
+    qrString: string;
+    expiresAt: string | null;
+  } | null>(null);
+  const [qrisPaid, setQrisPaid] = useState(false);
 
   useEffect(() => {
     if (!saveError && !saveSuccess) return;
@@ -111,15 +134,64 @@ export function TransactionForm() {
     return () => window.clearTimeout(t);
   }, [saveError, saveSuccess]);
 
+  useEffect(() => {
+    if (!qrisDynamic) return;
+    const supabase = createClient();
+    let cancelled = false;
+
+    async function fetchCurrent() {
+      const { data } = await supabase
+        .from("payments")
+        .select("status")
+        .eq("id", qrisDynamic.paymentId)
+        .maybeSingle();
+      if (cancelled) return;
+      if (data?.status === "paid") setQrisPaid(true);
+    }
+
+    fetchCurrent();
+
+    const channel = supabase
+      .channel(`payments:${qrisDynamic.paymentId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "payments",
+          filter: `id=eq.${qrisDynamic.paymentId}`,
+        },
+        (payload: unknown) => {
+          const nextStatus = (payload as { new?: { status?: unknown } })?.new?.status;
+          if (nextStatus === "paid") setQrisPaid(true);
+        },
+      )
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+    };
+  }, [qrisDynamic]);
+
   function resetFormInputs() {
     setCustomerName("");
     setCustomerPhone("");
     setCustomerNote("");
     setCashReceived("");
-    setReceivedAt(new Date().toISOString().slice(0, 16));
-    const d = new Date();
+    
+    // Reset dates to current local time
+    const now = new Date();
+    const tzOffset = now.getTimezoneOffset() * 60000;
+    const localNow = new Date(now.getTime() - tzOffset);
+    
+    setReceivedAt(localNow.toISOString().slice(0, 16));
+    
+    const d = new Date(now);
     d.setDate(d.getDate() + 2);
-    setDueAt(d.toISOString().slice(0, 16));
+    const localDue = new Date(d.getTime() - tzOffset);
+    setDueAt(localDue.toISOString().slice(0, 16));
+    
     setPaymentMethod("cash");
     nextItemIdRef.current = 1;
     setItems([{ id: "0", serviceName: "", unit: "kg", qty: 1, price: 0 }]);
@@ -178,8 +250,20 @@ export function TransactionForm() {
 
     if (result.success) {
       setIsSaving(false);
-      resetFormInputs();
-      setSaveSuccess(`Transaksi ${result.data.orderNo} berhasil disimpan!`);
+      if (result.data.qris) {
+        setQrisPaid(false);
+        setQrisDynamic({
+          orderNo: result.data.orderNo,
+          paymentId: result.data.qris.paymentId,
+          qrString: result.data.qris.qrString,
+          expiresAt: result.data.qris.expiresAt,
+        });
+        setSaveSuccess(`Transaksi ${result.data.orderNo} berhasil dibuat. Menunggu pembayaran QRIS.`);
+        resetFormInputs();
+      } else {
+        resetFormInputs();
+        setSaveSuccess(`Transaksi ${result.data.orderNo} berhasil disimpan!`);
+      }
     } else {
       setSaveError(result.error || "Gagal menyimpan transaksi");
       setIsSaving(false);
@@ -552,8 +636,9 @@ export function TransactionForm() {
                 <input
                   type="datetime-local"
                   value={receivedAt}
-                  onChange={(e) => setReceivedAt(e.target.value)}
-                  className="h-11 rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none focus:border-sky-400/70 focus:ring-4 focus:ring-sky-400/10"
+                  readOnly
+                  disabled
+                  className="h-11 rounded-xl border border-zinc-200 bg-zinc-50 px-3 text-sm text-zinc-500 outline-none cursor-not-allowed"
                 />
               </label>
 
@@ -620,7 +705,11 @@ export function TransactionForm() {
               onClick={handleSave}
               className="inline-flex h-11 items-center justify-center rounded-xl bg-zinc-900 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-200 disabled:text-zinc-500"
             >
-              {isSaving ? "Memproses..." : paymentMethod === "cash" ? "Bayar" : "Simpan Transaksi"}
+              {isSaving
+                ? "Memproses..."
+                : paymentMethod === "cash" || paymentMethod === "qris_dynamic"
+                  ? "Bayar"
+                  : "Simpan Transaksi"}
             </button>
             <button
               type="button"
@@ -649,6 +738,64 @@ export function TransactionForm() {
           </div>
         </div>
       </div>
+
+      {qrisDynamic ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white shadow-xl">
+            <div className="flex items-start justify-between gap-4 border-b border-zinc-100 p-5">
+              <div className="flex flex-col gap-1">
+                <div className="text-sm font-semibold text-zinc-900">QRIS Dinamis</div>
+                <div className="text-xs text-zinc-500">{qrisDynamic.orderNo}</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setQrisDynamic(null)}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-zinc-200 text-zinc-600 transition hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
+                aria-label="Tutup"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M18 6 6 18" />
+                  <path d="M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-4 p-5">
+              <div className="flex flex-col items-center gap-3">
+                <div className="rounded-2xl border border-zinc-200 bg-white p-3">
+                  <QRCodeCanvas value={qrisDynamic.qrString} size={240} />
+                </div>
+                <div
+                  className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                    qrisPaid ? "bg-emerald-500/10 text-emerald-700" : "bg-amber-500/10 text-amber-700"
+                  }`}
+                >
+                  {qrisPaid ? "Lunas" : "Menunggu Pembayaran"}
+                </div>
+                {qrisDynamic.expiresAt ? (
+                  <div className="text-xs text-zinc-500">
+                    Kedaluwarsa: {new Date(qrisDynamic.expiresAt).toLocaleString("id-ID")}
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="text-xs text-zinc-500">
+                Scan QR menggunakan aplikasi e-wallet atau mobile banking yang mendukung QRIS.
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 border-t border-zinc-100 p-5">
+              <button
+                type="button"
+                onClick={() => setQrisDynamic(null)}
+                className="inline-flex h-10 items-center justify-center rounded-xl border border-zinc-200 bg-white px-4 text-sm font-medium text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

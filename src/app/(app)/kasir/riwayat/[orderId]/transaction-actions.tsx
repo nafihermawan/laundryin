@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { payOrder, updateOrderStatus, type PayOrderInput } from "../actions";
+import { payOrder, startQrisDynamicForOrder, updateOrderStatus, type PayOrderInput } from "../actions";
+import { createClient } from "@/lib/supabase/browser";
+import { QRCodeCanvas } from "qrcode.react";
 
 function getLaundryStatus(status: string) {
   return status === "diproses" ? "diterima" : status;
@@ -38,11 +40,16 @@ export function TransactionActions({
   const [status, setStatus] = useState(getLaundryStatus(currentStatus));
   const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [payingOpen, setPayingOpen] = useState(false);
-  const [payMethod, setPayMethod] = useState<PayOrderInput["method"]>("cash");
+  const [payMethod, setPayMethod] = useState<PayOrderInput["method"] | "qris_dynamic">("cash");
   const [cashReceived, setCashReceived] = useState<string>("");
   const [referenceNo, setReferenceNo] = useState("");
   const [payNotes, setPayNotes] = useState("");
   const [isPaying, setIsPaying] = useState(false);
+  const [isGeneratingQris, setIsGeneratingQris] = useState(false);
+  const [qrisDynamic, setQrisDynamic] = useState<{ paymentId: string; qrString: string; expiresAt: string | null } | null>(
+    null,
+  );
+  const [qrisPaid, setQrisPaid] = useState(false);
 
   useEffect(() => {
     setStatus(getLaundryStatus(currentStatus));
@@ -60,6 +67,8 @@ export function TransactionActions({
     setCashReceived(total > 0 ? String(total) : "");
     setReferenceNo("");
     setPayNotes("");
+    setQrisDynamic(null);
+    setQrisPaid(false);
   }
 
   async function handleStatusChange(nextStatus: string) {
@@ -74,6 +83,19 @@ export function TransactionActions({
   }
 
   async function handlePayConfirm() {
+    if (payMethod === "qris_dynamic") {
+      setIsGeneratingQris(true);
+      const res = await startQrisDynamicForOrder(orderId);
+      setIsGeneratingQris(false);
+      if (res.success) {
+        setQrisPaid(false);
+        setQrisDynamic(res.data);
+        return;
+      }
+      setToast({ type: "error", message: res.error || "Gagal membuat QRIS dinamis." });
+      return;
+    }
+
     const cashReceivedNumber =
       payMethod === "cash" && cashReceived.trim() !== "" ? Number(cashReceived) : undefined;
 
@@ -86,7 +108,7 @@ export function TransactionActions({
 
     setIsPaying(true);
     const res = await payOrder(orderId, {
-      method: payMethod,
+      method: payMethod as PayOrderInput["method"],
       cashReceived: cashReceivedNumber,
       referenceNo: referenceNo.trim() || undefined,
       notes: payNotes.trim() || undefined,
@@ -101,6 +123,54 @@ export function TransactionActions({
     }
     setToast({ type: "error", message: res.error || "Gagal menyimpan pembayaran." });
   }
+
+  useEffect(() => {
+    if (!qrisDynamic) return;
+    const supabase = createClient();
+    let cancelled = false;
+
+    async function fetchCurrent() {
+      const { data } = await supabase
+        .from("payments")
+        .select("status")
+        .eq("id", qrisDynamic.paymentId)
+        .maybeSingle();
+      if (cancelled) return;
+      if (data?.status === "paid") setQrisPaid(true);
+    }
+
+    fetchCurrent();
+
+    const channel = supabase
+      .channel(`payments:${qrisDynamic.paymentId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "payments",
+          filter: `id=eq.${qrisDynamic.paymentId}`,
+        },
+        (payload: unknown) => {
+          const nextStatus = (payload as { new?: { status?: unknown } })?.new?.status;
+          if (nextStatus === "paid") setQrisPaid(true);
+        },
+      )
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+    };
+  }, [qrisDynamic]);
+
+  useEffect(() => {
+    if (!qrisPaid) return;
+    if (!payingOpen) return;
+    setPayingOpen(false);
+    setToast({ type: "success", message: "Pembayaran QRIS berhasil (lunas)." });
+    router.refresh();
+  }, [payingOpen, qrisPaid, router]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -188,12 +258,13 @@ export function TransactionActions({
                 <div className="text-xs font-medium text-zinc-600">Metode</div>
                 <select
                   value={payMethod}
-                  onChange={(e) => setPayMethod(e.target.value as PayOrderInput["method"])}
+                  onChange={(e) => setPayMethod(e.target.value as PayOrderInput["method"] | "qris_dynamic")}
                   className="h-10 rounded-xl border border-zinc-200 bg-white px-3 text-sm focus:border-sky-400 focus:outline-none focus:ring-4 focus:ring-sky-400/10"
                 >
                   <option value="cash">Cash</option>
                   <option value="transfer">Transfer</option>
                   <option value="qris_manual">QRIS Manual</option>
+                  <option value="qris_dynamic">QRIS Dinamis</option>
                 </select>
               </div>
 
@@ -218,6 +289,13 @@ export function TransactionActions({
                       Kembalian: {formatIDR((Number(cashReceived || 0) || 0) - total)}
                     </div>
                   </div>
+                ) : payMethod === "qris_dynamic" ? (
+                  <div className="flex flex-col gap-1">
+                    <div className="text-xs font-medium text-zinc-600">QRIS</div>
+                    <div className="flex h-10 items-center rounded-xl border border-zinc-200 bg-zinc-50 px-3 text-sm text-zinc-600">
+                      {qrisPaid ? "Lunas" : "Menunggu pembayaran"}
+                    </div>
+                  </div>
                 ) : (
                   <div className="flex flex-col gap-1">
                     <div className="text-xs font-medium text-zinc-600">No. Referensi (Opsional)</div>
@@ -240,6 +318,34 @@ export function TransactionActions({
                   className="h-10 rounded-xl border border-zinc-200 bg-white px-3 text-sm focus:border-sky-400 focus:outline-none focus:ring-4 focus:ring-sky-400/10"
                 />
               </div>
+
+              {payMethod === "qris_dynamic" ? (
+                <div className="flex flex-col items-center gap-3 rounded-2xl border border-zinc-200 bg-white p-4">
+                  {qrisDynamic ? (
+                    <>
+                      <div className="rounded-2xl border border-zinc-200 bg-white p-3">
+                        <QRCodeCanvas value={qrisDynamic.qrString} size={220} />
+                      </div>
+                      <div
+                        className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                          qrisPaid ? "bg-emerald-500/10 text-emerald-700" : "bg-amber-500/10 text-amber-700"
+                        }`}
+                      >
+                        {qrisPaid ? "Lunas" : "Menunggu Pembayaran"}
+                      </div>
+                      {qrisDynamic.expiresAt ? (
+                        <div className="text-xs text-zinc-500">
+                          Kedaluwarsa: {new Date(qrisDynamic.expiresAt).toLocaleString("id-ID")}
+                        </div>
+                      ) : null}
+                    </>
+                  ) : (
+                    <div className="text-xs text-zinc-500">
+                      Klik Generate untuk membuat QRIS dinamis, lalu customer scan untuk bayar.
+                    </div>
+                  )}
+                </div>
+              ) : null}
             </div>
 
             <div className="flex items-center justify-end gap-2 border-t border-zinc-100 p-5">
@@ -253,10 +359,18 @@ export function TransactionActions({
               <button
                 type="button"
                 onClick={handlePayConfirm}
-                disabled={isPaying}
+                disabled={isPaying || isGeneratingQris}
                 className="inline-flex h-10 items-center justify-center rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-60"
               >
-                {isPaying ? "Memproses..." : "Konfirmasi Bayar"}
+                {payMethod === "qris_dynamic"
+                  ? isGeneratingQris
+                    ? "Membuat QR..."
+                    : qrisDynamic
+                      ? "Generate Ulang"
+                      : "Generate QR"
+                  : isPaying
+                    ? "Memproses..."
+                    : "Konfirmasi Bayar"}
               </button>
             </div>
           </div>

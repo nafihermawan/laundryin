@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { success as actionSuccess, error as actionError, type ActionResponse } from "@/lib/action-response";
 import { getUserRole } from "@/lib/auth/get-user-role";
+import { env } from "@/lib/env";
+import { createMidtransQrisCharge } from "@/lib/payments/midtrans";
 
 export type TransactionData = {
   customer: {
@@ -18,14 +20,29 @@ export type TransactionData = {
     price: number;
   }>;
   status: string;
-  paymentMethod: "cash" | "transfer" | "qris_manual";
+  paymentMethod: "cash" | "transfer" | "qris_manual" | "qris_dynamic";
   cashReceived?: number;
   receivedAt: string;
   dueAt: string;
   total: number;
 };
 
-export async function saveTransaction(data: TransactionData): Promise<ActionResponse<{ orderNo: string }>> {
+export async function saveTransaction(
+  data: TransactionData,
+): Promise<
+  ActionResponse<
+    { orderNo: string } & (
+      | { qris?: undefined }
+      | {
+          qris: {
+            paymentId: string;
+            qrString: string;
+            expiresAt: string | null;
+          };
+        }
+    )
+  >
+> {
   const supabase = await createClient();
 
   // 1. Dapatkan user ID pembuat
@@ -70,9 +87,12 @@ export async function saveTransaction(data: TransactionData): Promise<ActionResp
       return actionError("Item transaksi tidak valid");
     }
 
-    const receivedAtTs = new Date(data.receivedAt);
+    // Parse receivedAt to ensure it is valid, but use current server time to be safe with DB constraints
+    // Since UI now locks it to current time, we can just use new Date().toISOString()
+    // to guarantee it passes the 'no future date' constraint that was failing due to client/server clock skew
+    const receivedAtTs = new Date();
+    const isoReceivedAt = receivedAtTs.toISOString();
     const dueAtTs = new Date(data.dueAt);
-    if (!Number.isFinite(receivedAtTs.getTime())) return actionError("Tanggal masuk tidak valid");
     if (!Number.isFinite(dueAtTs.getTime())) return actionError("Tanggal estimasi tidak valid");
     if (dueAtTs.getTime() < receivedAtTs.getTime()) {
       return actionError("Estimasi tidak boleh sebelum tanggal masuk");
@@ -143,7 +163,7 @@ export async function saveTransaction(data: TransactionData): Promise<ActionResp
         order_no: orderNo,
         customer_id: customerId,
         status: data.status,
-        received_at: data.receivedAt,
+        received_at: isoReceivedAt,
         due_at: data.dueAt,
         notes: data.customer.notes || "",
         created_by: user.id,
@@ -187,7 +207,7 @@ export async function saveTransaction(data: TransactionData): Promise<ActionResp
             .join(" | ")
         : null;
 
-    const { error: payError } = await supabase
+    const { data: createdPayment, error: payError } = await supabase
       .from("payments")
       .insert({
         order_id: createdOrderId,
@@ -198,11 +218,55 @@ export async function saveTransaction(data: TransactionData): Promise<ActionResp
         status: data.paymentMethod === "cash" ? "paid" : "pending",
         received_by: user.id,
         notes: paymentNotes,
-      });
+      })
+      .select("id")
+      .single();
 
     if (payError) {
       await supabase.from("orders").delete().eq("id", createdOrderId);
       return actionError(payError.message || "Gagal menyimpan pembayaran");
+    }
+
+    if (data.paymentMethod === "qris_dynamic") {
+      if (!env.APP_BASE_URL) {
+        await supabase.from("orders").delete().eq("id", createdOrderId);
+        return actionError("APP_BASE_URL belum diset");
+      }
+
+      const notificationUrl = `${env.APP_BASE_URL.replace(/\/+$/, "")}/api/webhooks/midtrans`;
+      const created = await createMidtransQrisCharge({
+        orderId: createdPayment.id,
+        grossAmount: computedTotal,
+        notificationUrl,
+      });
+
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+
+      const { error: qrisUpdateError } = await supabase
+        .from("payments")
+        .update({
+          provider: created.provider,
+          provider_ref: created.providerRef,
+          provider_status: created.providerStatus,
+          provider_payload: created.raw,
+          qris_qr_string: created.qrString,
+          qris_expires_at: expiresAt,
+        })
+        .eq("id", createdPayment.id);
+
+      if (qrisUpdateError) {
+        await supabase.from("orders").delete().eq("id", createdOrderId);
+        return actionError(qrisUpdateError.message || "Gagal membuat QRIS dinamis");
+      }
+
+      try {
+        revalidatePath("/kasir/riwayat");
+      } catch {}
+
+      return actionSuccess({
+        orderNo,
+        qris: { paymentId: createdPayment.id, qrString: created.qrString, expiresAt },
+      });
     }
 
     try {

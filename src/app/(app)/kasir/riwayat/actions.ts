@@ -3,7 +3,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { ActionResponse, success, error as actionError } from "@/lib/action-response";
+import { env } from "@/lib/env";
 import { getUserRole } from "@/lib/auth/get-user-role";
+import { createMidtransQrisCharge } from "@/lib/payments/midtrans";
 
 export async function updateOrderStatus(orderId: string, newStatus: string): Promise<ActionResponse> {
   const supabase = await createClient();
@@ -28,7 +30,13 @@ export type PayOrderInput = {
   notes?: string;
 };
 
-export async function payOrder(orderId: string, input: PayOrderInput): Promise<ActionResponse> {
+export type StartQrisDynamicOutput = {
+  paymentId: string;
+  qrString: string;
+  expiresAt: string | null;
+};
+
+export async function startQrisDynamicForOrder(orderId: string): Promise<ActionResponse<StartQrisDynamicOutput>> {
   const supabase = await createClient();
 
   const {
@@ -39,7 +47,8 @@ export async function payOrder(orderId: string, input: PayOrderInput): Promise<A
 
   const role = await getUserRole(supabase, user.id);
 
-  // Cek apakah kasir sudah buka shift (hanya jika role bukan admin)
+  if (!env.APP_BASE_URL) return actionError("APP_BASE_URL belum diset");
+
   let shiftId: string | null = null;
   if (role !== "admin") {
     const { data: shift } = await supabase
@@ -58,7 +67,7 @@ export async function payOrder(orderId: string, input: PayOrderInput): Promise<A
 
   const { data: order, error: orderError } = await supabase
     .from("orders")
-    .select("received_at")
+    .select("received_at, order_no")
     .eq("id", orderId)
     .maybeSingle();
 
@@ -91,66 +100,73 @@ export async function payOrder(orderId: string, input: PayOrderInput): Promise<A
     .eq("order_id", orderId);
 
   if (itemsError) return actionError(itemsError.message);
-
   const total = (items ?? []).reduce((sum, it) => sum + Number(it.subtotal ?? 0), 0);
 
-  if (input.method === "cash") {
-    if (typeof input.cashReceived !== "number" || input.cashReceived < total) {
-      return actionError("Uang diterima tidak mencukupi total tagihan");
-    }
-  }
-
-  const cashReceived = typeof input.cashReceived === "number" ? input.cashReceived : null;
-  const change = cashReceived !== null ? cashReceived - total : null;
-  const notes =
-    input.method === "cash"
-      ? [input.notes?.trim(), cashReceived !== null ? `cash_received=${cashReceived}` : null, change !== null ? `change=${change}` : null]
-          .filter(Boolean)
-          .join(" | ")
-      : input.notes?.trim() || null;
-
-  const { data: pendingPayment, error: pendingPaymentError } = await supabase
+  const { data: inserted, error: insertError } = await supabase
     .from("payments")
-    .select("id")
-    .eq("order_id", orderId)
-    .eq("status", "pending")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (pendingPaymentError) return actionError(pendingPaymentError.message);
-
-  if (pendingPayment?.id) {
-    const { error: updateError } = await supabase
-      .from("payments")
-      .update({
-        cash_register_id: shiftId,
-        paid_at: new Date().toISOString(),
-        amount: total,
-        method: input.method,
-        status: "paid",
-        received_by: user.id,
-        reference_no: input.referenceNo?.trim() || null,
-        notes,
-      })
-      .eq("id", pendingPayment.id);
-
-    if (updateError) return actionError(updateError.message);
-  } else {
-    const { error: insertError } = await supabase.from("payments").insert({
+    .insert({
       order_id: orderId,
       cash_register_id: shiftId,
-      paid_at: new Date().toISOString(),
+      paid_at: null,
       amount: total,
-      method: input.method,
-      status: "paid",
+      method: "qris_dynamic",
+      status: "pending",
       received_by: user.id,
-      reference_no: input.referenceNo?.trim() || null,
-      notes,
-    });
+    })
+    .select("id")
+    .single();
 
-    if (insertError) return actionError(insertError.message);
-  }
+  if (insertError) return actionError(insertError.message);
+  const paymentId = inserted.id;
+
+  const notificationUrl = `${env.APP_BASE_URL.replace(/\/+$/, "")}/api/webhooks/midtrans`;
+  const created = await createMidtransQrisCharge({
+    orderId: paymentId,
+    grossAmount: total,
+    notificationUrl,
+  });
+
+  const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+
+  const { error: updateError } = await supabase
+    .from("payments")
+    .update({
+      cash_register_id: shiftId,
+      amount: total,
+      method: "qris_dynamic",
+      provider: created.provider,
+      provider_ref: created.providerRef,
+      provider_status: created.providerStatus,
+      provider_payload: created.raw,
+      qris_qr_string: created.qrString,
+      qris_expires_at: expiresAt,
+    })
+    .eq("id", paymentId);
+
+  if (updateError) return actionError(updateError.message);
+
+  revalidatePath("/kasir/riwayat");
+  return success({ paymentId, qrString: created.qrString, expiresAt });
+}
+
+export async function payOrder(orderId: string, input: PayOrderInput): Promise<ActionResponse> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return actionError("User tidak terautentikasi");
+
+  const { error } = await supabase.rpc("pay_order", {
+    order_id: orderId,
+    method: input.method,
+    cash_received: input.cashReceived ?? null,
+    reference_no: input.referenceNo ?? null,
+    notes: input.notes ?? null,
+  });
+
+  if (error) return actionError(error.message);
 
   revalidatePath("/kasir/riwayat");
   return success(undefined);

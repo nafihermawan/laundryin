@@ -124,6 +124,11 @@ alter table public.payments
     (status = 'pending' and paid_at is null)
   );
 
+alter table public.payments drop constraint if exists payments_method_check;
+alter table public.payments
+  add constraint payments_method_check
+  check (method in ('cash', 'transfer', 'qris_manual', 'qris_dynamic'));
+
 alter table public.customers enable row level security;
 alter table public.services enable row level security;
 alter table public.orders enable row level security;
@@ -311,12 +316,43 @@ using (true)
 with check (true);
 
 drop policy if exists "payments_all_authenticated" on public.payments;
-create policy "payments_all_authenticated"
+drop policy if exists "payments_select_auth" on public.payments;
+drop policy if exists "payments_insert_own" on public.payments;
+drop policy if exists "payments_update_pending_own" on public.payments;
+drop policy if exists "payments_update_admin" on public.payments;
+drop policy if exists "payments_delete_admin" on public.payments;
+
+create policy "payments_select_auth"
 on public.payments
-for all
+for select
 to authenticated
-using (true)
-with check (true);
+using (true);
+
+create policy "payments_insert_own"
+on public.payments
+for insert
+to authenticated
+with check (public.is_admin() or received_by = auth.uid());
+
+create policy "payments_update_pending_own"
+on public.payments
+for update
+to authenticated
+using (public.is_admin() or received_by = auth.uid())
+with check (
+  public.is_admin() or
+  (
+    received_by = auth.uid() and
+    status = 'pending' and
+    paid_at is null
+  )
+);
+
+create policy "payments_delete_admin"
+on public.payments
+for delete
+to authenticated
+using (public.is_admin());
 
 create or replace function public.set_updated_at()
 returns trigger
@@ -381,3 +417,147 @@ where status = 'open';
 -- Modifikasi tabel payments untuk mencatat cash_register_id (opsional tapi disarankan untuk tracking)
 alter table public.payments
   add column if not exists cash_register_id uuid references public.cash_registers (id);
+
+alter table public.payments
+  add column if not exists provider text,
+  add column if not exists provider_ref text,
+  add column if not exists provider_status text,
+  add column if not exists provider_payload jsonb,
+  add column if not exists qris_qr_string text,
+  add column if not exists qris_expires_at timestamptz;
+
+create index if not exists payments_order_id_created_at_idx on public.payments(order_id, created_at desc);
+create index if not exists payments_provider_ref_idx on public.payments(provider_ref);
+
+create or replace function public.pay_order(
+  order_id uuid,
+  method text,
+  cash_received numeric,
+  reference_no text,
+  notes text
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  role text;
+  shift_id uuid;
+  received_at timestamptz;
+  total numeric(12,2);
+  pending_payment_id uuid;
+  cash_change numeric(12,2);
+  merged_notes text;
+begin
+  if auth.uid() is null then
+    raise exception 'User tidak terautentikasi';
+  end if;
+
+  select p.role into role from public.profiles p where p.id = auth.uid();
+  role := coalesce(role, 'cashier');
+
+  if method not in ('cash', 'transfer', 'qris_manual') then
+    raise exception 'Metode pembayaran tidak valid';
+  end if;
+
+  if role <> 'admin' then
+    select cr.id into shift_id
+    from public.cash_registers cr
+    where cr.user_id = auth.uid() and cr.status = 'open'
+    limit 1;
+
+    if shift_id is null then
+      raise exception 'Anda harus membuka shift kasir terlebih dahulu sebelum menerima pembayaran';
+    end if;
+  end if;
+
+  select o.received_at into received_at
+  from public.orders o
+  where o.id = order_id;
+
+  if received_at is null then
+    raise exception 'Order tidak ditemukan';
+  end if;
+
+  if role <> 'admin' then
+    if received_at > now() + interval '5 minutes' then
+      raise exception 'Tidak bisa bayar: tanggal masuk berada di masa depan';
+    end if;
+  end if;
+
+  if exists (
+    select 1 from public.payments p
+    where p.order_id = pay_order.order_id and p.status = 'paid'
+    limit 1
+  ) then
+    raise exception 'Order sudah lunas';
+  end if;
+
+  select coalesce(sum(oi.subtotal), 0)::numeric(12,2) into total
+  from public.order_items oi
+  where oi.order_id = pay_order.order_id;
+
+  if method = 'cash' then
+    if cash_received is null or cash_received < total then
+      raise exception 'Uang diterima tidak mencukupi total tagihan';
+    end if;
+    cash_change := cash_received - total;
+  else
+    cash_received := null;
+    cash_change := null;
+  end if;
+
+  merged_notes := nullif(btrim(notes), '');
+  if method = 'cash' then
+    merged_notes := concat_ws(
+      ' | ',
+      merged_notes,
+      case when cash_received is not null then format('cash_received=%s', cash_received) else null end,
+      case when cash_change is not null then format('change=%s', cash_change) else null end
+    );
+  end if;
+
+  select p.id into pending_payment_id
+  from public.payments p
+  where p.order_id = pay_order.order_id and p.status = 'pending'
+  order by p.created_at desc
+  limit 1;
+
+  if pending_payment_id is not null then
+    update public.payments
+    set
+      cash_register_id = shift_id,
+      paid_at = now(),
+      amount = total,
+      method = pay_order.method,
+      status = 'paid',
+      received_by = auth.uid(),
+      reference_no = nullif(btrim(reference_no), ''),
+      notes = merged_notes
+    where id = pending_payment_id;
+  else
+    insert into public.payments (
+      order_id,
+      cash_register_id,
+      paid_at,
+      amount,
+      method,
+      status,
+      received_by,
+      reference_no,
+      notes
+    ) values (
+      pay_order.order_id,
+      shift_id,
+      now(),
+      total,
+      pay_order.method,
+      'paid',
+      auth.uid(),
+      nullif(btrim(reference_no), ''),
+      merged_notes
+    );
+  end if;
+end;
+$$;
