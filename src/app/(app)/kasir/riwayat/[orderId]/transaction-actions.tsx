@@ -70,6 +70,7 @@ export function TransactionActions({
     expiresAt: string | null;
   } | null>(null);
   const [qrisPaid, setQrisPaid] = useState(false);
+  const [qrisDynamicStatus, setQrisDynamicStatus] = useState<string | null>(null);
 
   useEffect(() => {
     setStatus(getLaundryStatus(currentStatus));
@@ -107,6 +108,7 @@ export function TransactionActions({
     setPayNotes("");
     setQrisDynamic(null);
     setQrisPaid(false);
+    setQrisDynamicStatus(null);
   }
 
   function openResumeQris() {
@@ -125,6 +127,7 @@ export function TransactionActions({
       expiresAt: existingQris.expiresAt,
     });
     setQrisPaid(false);
+    setQrisDynamicStatus(existingQris.status);
   }
 
   async function handleStatusChange(nextStatus: string) {
@@ -146,6 +149,7 @@ export function TransactionActions({
       if (res.success) {
         setQrisPaid(false);
         setQrisDynamic(res.data);
+        setQrisDynamicStatus("pending");
         return;
       }
       setToast({ type: "error", message: res.error || "Gagal membuat QRIS dinamis." });
@@ -193,6 +197,7 @@ export function TransactionActions({
         .eq("id", paymentId)
         .maybeSingle();
       if (cancelled) return;
+      if (typeof data?.status === "string") setQrisDynamicStatus(data.status);
       if (data?.status === "paid") setQrisPaid(true);
     }
 
@@ -210,6 +215,7 @@ export function TransactionActions({
         },
         (payload: unknown) => {
           const nextStatus = (payload as { new?: { status?: unknown } })?.new?.status;
+          if (typeof nextStatus === "string") setQrisDynamicStatus(nextStatus);
           if (nextStatus === "paid") setQrisPaid(true);
         },
       )
@@ -394,13 +400,30 @@ export function TransactionActions({
                       <div className="rounded-2xl border border-zinc-200 bg-white p-3">
                         <QRCodeCanvas value={qrisDynamic.qrString} size={220} />
                       </div>
-                      <div
-                        className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                          qrisPaid ? "bg-emerald-500/10 text-emerald-700" : "bg-amber-500/10 text-amber-700"
-                        }`}
-                      >
-                        {qrisPaid ? "Lunas" : "Menunggu Pembayaran"}
-                      </div>
+                      {(() => {
+                        const expiredByTime =
+                          !qrisPaid &&
+                          typeof qrisDynamic.expiresAt === "string" &&
+                          Number.isFinite(new Date(qrisDynamic.expiresAt).getTime()) &&
+                          new Date(qrisDynamic.expiresAt).getTime() < Date.now();
+                        const isExpired =
+                          qrisDynamicStatus === "expired" ||
+                          qrisDynamicStatus === "failed" ||
+                          expiredByTime;
+                        const label = qrisPaid
+                          ? "Lunas"
+                          : isExpired
+                            ? "Kedaluwarsa"
+                            : "Menunggu Pembayaran";
+                        const classes = qrisPaid
+                          ? "bg-emerald-500/10 text-emerald-700"
+                          : isExpired
+                            ? "bg-red-500/10 text-red-700"
+                            : "bg-amber-500/10 text-amber-700";
+                        return (
+                          <div className={`rounded-full px-3 py-1 text-xs font-semibold ${classes}`}>{label}</div>
+                        );
+                      })()}
                       {qrisDynamic.expiresAt ? (
                         <div className="text-xs text-zinc-500">
                           Kedaluwarsa: {new Date(qrisDynamic.expiresAt).toLocaleString("id-ID")}
@@ -429,6 +452,44 @@ export function TransactionActions({
                               Copy
                             </button>
                           </div>
+                          {(() => {
+                            const expiredByTime =
+                              !qrisPaid &&
+                              typeof qrisDynamic.expiresAt === "string" &&
+                              Number.isFinite(new Date(qrisDynamic.expiresAt).getTime()) &&
+                              new Date(qrisDynamic.expiresAt).getTime() < Date.now();
+                            const isExpired =
+                              qrisDynamicStatus === "expired" ||
+                              qrisDynamicStatus === "failed" ||
+                              expiredByTime;
+                            if (!isExpired || qrisPaid) return null;
+                            return (
+                              <button
+                                type="button"
+                                disabled={isGeneratingQris}
+                                onClick={async () => {
+                                  setIsGeneratingQris(true);
+                                  try {
+                                    const res = await startQrisDynamicForOrder(orderId);
+                                    if (res.success) {
+                                      setQrisPaid(false);
+                                      setQrisDynamic(res.data);
+                                      setQrisDynamicStatus("pending");
+                                      setToast({ type: "success", message: "QR baru berhasil dibuat. Silakan scan ulang." });
+                                      router.refresh();
+                                      return;
+                                    }
+                                    setToast({ type: "error", message: res.error || "Gagal membuat QR baru." });
+                                  } finally {
+                                    setIsGeneratingQris(false);
+                                  }
+                                }}
+                                className="mt-2 inline-flex h-10 w-full items-center justify-center rounded-xl bg-emerald-600 px-4 text-xs font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-400"
+                              >
+                                {isGeneratingQris ? "Membuat QR..." : "Generate QR Baru"}
+                              </button>
+                            );
+                          })()}
                           <button
                             type="button"
                             disabled={isCheckingQris || qrisPaid}
@@ -438,6 +499,7 @@ export function TransactionActions({
                               try {
                                 const res = await checkQrisDynamicPaymentStatus(qrisDynamic.paymentId);
                                 if (res.success) {
+                                  setQrisDynamicStatus(res.data.status);
                                   if (res.data.status === "paid") {
                                     setQrisPaid(true);
                                     setToast({ type: "success", message: "Pembayaran QRIS berhasil (lunas)." });
