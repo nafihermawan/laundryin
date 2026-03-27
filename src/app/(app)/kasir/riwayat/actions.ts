@@ -150,6 +150,11 @@ export async function startQrisDynamicForOrder(orderId: string): Promise<ActionR
   if (updateError) return actionError(updateError.message);
 
   revalidatePath("/kasir/riwayat");
+  if (env.MIDTRANS_IS_PRODUCTION !== "true") {
+    console.log(
+      `Midtrans QRIS simulator: ${env.APP_BASE_URL.replace(/\/+$/, "")}/api/simulators/midtrans/qris/${paymentId}`,
+    );
+  }
   return success({
     paymentId,
     providerRef: created.providerRef,

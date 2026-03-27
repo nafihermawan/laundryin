@@ -371,6 +371,16 @@ export function TransactionActions({
                               Copy
                             </button>
                           </div>
+                          {origin ? (
+                            <a
+                              href={`${origin}/api/simulators/midtrans/qris/${qrisDynamic.paymentId}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="mt-2 inline-flex h-10 w-full items-center justify-center rounded-xl bg-sky-600 px-4 text-xs font-semibold text-white transition hover:bg-sky-700"
+                            >
+                              Buka Simulator Midtrans
+                            </a>
+                          ) : null}
                         </div>
                       ) : null}
 

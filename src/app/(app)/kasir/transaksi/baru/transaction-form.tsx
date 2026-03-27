@@ -285,6 +285,10 @@ export function TransactionForm() {
   const simulatorImageUrl = qrisDynamic?.imageUrl ?? null;
   const publicImageUrl =
     qrisDynamic && origin ? `${origin}/api/qris/${qrisDynamic.paymentId}/qr` : null;
+  const simulatorDeeplink =
+    qrisDynamic && origin
+      ? `${origin}/api/simulators/midtrans/qris/${qrisDynamic.paymentId}`
+      : null;
 
   return (
     <div className="relative pb-24 lg:pb-0">
@@ -809,6 +813,16 @@ export function TransactionForm() {
                       Copy
                     </button>
                   </div>
+                  {simulatorDeeplink ? (
+                    <a
+                      href={simulatorDeeplink}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-2 inline-flex h-10 w-full items-center justify-center rounded-xl bg-sky-600 px-4 text-xs font-semibold text-white transition hover:bg-sky-700"
+                    >
+                      Buka Simulator Midtrans
+                    </a>
+                  ) : null}
                 </div>
               ) : null}
 

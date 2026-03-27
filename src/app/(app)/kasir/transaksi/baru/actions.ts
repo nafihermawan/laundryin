@@ -264,6 +264,12 @@ export async function saveTransaction(
         revalidatePath("/kasir/riwayat");
       } catch {}
 
+      if (env.MIDTRANS_IS_PRODUCTION !== "true") {
+        console.log(
+          `Midtrans QRIS simulator: ${env.APP_BASE_URL.replace(/\/+$/, "")}/api/simulators/midtrans/qris/${createdPayment.id}`,
+        );
+      }
+
       return actionSuccess({
         orderNo,
         qris: {
