@@ -279,6 +279,10 @@ export function TransactionForm() {
     );
   }
 
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const simulatorImageUrl =
+    qrisDynamic && origin ? `${origin}/api/qris/${qrisDynamic.paymentId}/qr` : null;
+
   return (
     <div className="relative pb-24 lg:pb-0">
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
@@ -779,12 +783,12 @@ export function TransactionForm() {
                 ) : null}
               </div>
 
-              {qrisDynamic.imageUrl ? (
+              {simulatorImageUrl ? (
                 <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
                   <div className="text-xs font-medium text-zinc-600">QR Code Image URL (Sandbox Simulator)</div>
                   <div className="mt-2 flex items-center gap-2">
                     <input
-                      value={qrisDynamic.imageUrl}
+                      value={simulatorImageUrl}
                       readOnly
                       className="h-10 w-full rounded-xl border border-zinc-200 bg-white px-3 text-xs text-zinc-700 outline-none"
                     />
@@ -792,7 +796,7 @@ export function TransactionForm() {
                       type="button"
                       onClick={async () => {
                         try {
-                          const url = qrisDynamic.imageUrl;
+                          const url = simulatorImageUrl;
                           if (!url) return;
                           await navigator.clipboard.writeText(url);
                         } catch {}

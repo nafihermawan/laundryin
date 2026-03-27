@@ -53,10 +53,15 @@ export function TransactionActions({
     expiresAt: string | null;
   } | null>(null);
   const [qrisPaid, setQrisPaid] = useState(false);
+  const [origin, setOrigin] = useState("");
 
   useEffect(() => {
     setStatus(getLaundryStatus(currentStatus));
   }, [currentStatus]);
+
+  useEffect(() => {
+    setOrigin(window.location.origin);
+  }, []);
 
   useEffect(() => {
     if (!toast) return;
@@ -342,22 +347,28 @@ export function TransactionActions({
                           Kedaluwarsa: {new Date(qrisDynamic.expiresAt).toLocaleString("id-ID")}
                         </div>
                       ) : null}
-                      {qrisDynamic.imageUrl ? (
+                      {origin ? (
                         <div className="w-full rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
                           <div className="text-xs font-medium text-zinc-600">QR Code Image URL (Sandbox Simulator)</div>
                           <div className="mt-2 flex items-center gap-2">
+                            {(() => {
+                              const url = `${origin}/api/qris/${qrisDynamic.paymentId}/qr`;
+                              return (
                             <input
-                              value={qrisDynamic.imageUrl}
+                              value={url}
                               readOnly
                               className="h-10 w-full rounded-xl border border-zinc-200 bg-white px-3 text-xs text-zinc-700 outline-none"
                             />
+                              );
+                            })()}
                             <button
                               type="button"
                               onClick={async () => {
                                 try {
-                                  const url = qrisDynamic.imageUrl;
-                                  if (!url) return;
-                                  await navigator.clipboard.writeText(url);
+                                  if (!origin) return;
+                                  await navigator.clipboard.writeText(
+                                    `${origin}/api/qris/${qrisDynamic.paymentId}/qr`,
+                                  );
                                 } catch {}
                               }}
                               className="inline-flex h-10 shrink-0 items-center justify-center rounded-xl border border-zinc-200 bg-white px-3 text-xs font-semibold text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
