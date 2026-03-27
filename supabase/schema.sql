@@ -534,7 +534,7 @@ begin
       method = pay_order.method,
       status = 'paid',
       received_by = auth.uid(),
-      reference_no = nullif(btrim(reference_no), ''),
+      reference_no = nullif(btrim(pay_order.reference_no), ''),
       notes = merged_notes
     where id = pending_payment_id;
   else
@@ -556,7 +556,7 @@ begin
       pay_order.method,
       'paid',
       auth.uid(),
-      nullif(btrim(reference_no), ''),
+      nullif(btrim(pay_order.reference_no), ''),
       merged_notes
     );
   end if;
