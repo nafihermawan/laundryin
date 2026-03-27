@@ -123,6 +123,8 @@ export function TransactionForm() {
   } | null>(null);
   const [qrisPaid, setQrisPaid] = useState(false);
   const [checkingQris, setCheckingQris] = useState(false);
+  const showQrisDebug = process.env.NEXT_PUBLIC_QRIS_DEBUG === "true";
+  const simulatorImageUrl = qrisDynamic?.imageUrl ?? null;
 
   useEffect(() => {
     if (!saveError && !saveSuccess) return;
@@ -280,7 +282,6 @@ export function TransactionForm() {
     );
   }
 
-  const simulatorImageUrl = qrisDynamic?.imageUrl ?? null;
 
   return (
     <div className="relative pb-24 lg:pb-0">
@@ -782,7 +783,7 @@ export function TransactionForm() {
                 ) : null}
               </div>
 
-              {simulatorImageUrl ? (
+              {showQrisDebug && simulatorImageUrl ? (
                 <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
                   <div className="text-xs font-medium text-zinc-600">QR Code Image URL (Sandbox Simulator)</div>
                   <div className="mt-2 flex items-center gap-2">
@@ -805,42 +806,42 @@ export function TransactionForm() {
                       Copy
                     </button>
                   </div>
-                  <button
-                    type="button"
-                    disabled={checkingQris || qrisPaid}
-                    onClick={async () => {
-                      if (!qrisDynamic) return;
-                      setCheckingQris(true);
-                      setSaveError(null);
-                      setSaveSuccess(null);
-                      try {
-                        const res = await checkQrisDynamicPaymentStatus(qrisDynamic.paymentId);
-                        if (res.success) {
-                          if (res.data.status === "paid") {
-                            setQrisPaid(true);
-                            setSaveSuccess("Pembayaran QRIS berhasil (lunas).");
-                          } else if (res.data.status === "pending") {
-                            setSaveSuccess("Pembayaran masih pending. Silakan coba cek lagi.");
-                          } else if (res.data.status === "expired") {
-                            setSaveError("QRIS sudah kedaluwarsa.");
-                          } else if (res.data.status === "failed") {
-                            setSaveError("Pembayaran gagal/ditolak.");
-                          } else {
-                            setSaveSuccess(`Status: ${res.data.status}`);
-                          }
-                        } else {
-                          setSaveError(res.error || "Gagal cek status pembayaran.");
-                        }
-                      } finally {
-                        setCheckingQris(false);
-                      }
-                    }}
-                    className="mt-2 inline-flex h-10 w-full items-center justify-center rounded-xl bg-zinc-900 px-4 text-xs font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-400"
-                  >
-                    {qrisPaid ? "Sudah Dibayar" : checkingQris ? "Mengecek..." : "Cek Status Pembayaran"}
-                  </button>
                 </div>
               ) : null}
+              <button
+                type="button"
+                disabled={checkingQris || qrisPaid}
+                onClick={async () => {
+                  if (!qrisDynamic) return;
+                  setCheckingQris(true);
+                  setSaveError(null);
+                  setSaveSuccess(null);
+                  try {
+                    const res = await checkQrisDynamicPaymentStatus(qrisDynamic.paymentId);
+                    if (res.success) {
+                      if (res.data.status === "paid") {
+                        setQrisPaid(true);
+                        setSaveSuccess("Pembayaran QRIS berhasil (lunas).");
+                      } else if (res.data.status === "pending") {
+                        setSaveSuccess("Pembayaran masih pending. Silakan coba cek lagi.");
+                      } else if (res.data.status === "expired") {
+                        setSaveError("QRIS sudah kedaluwarsa.");
+                      } else if (res.data.status === "failed") {
+                        setSaveError("Pembayaran gagal/ditolak.");
+                      } else {
+                        setSaveSuccess(`Status: ${res.data.status}`);
+                      }
+                    } else {
+                      setSaveError(res.error || "Gagal cek status pembayaran.");
+                    }
+                  } finally {
+                    setCheckingQris(false);
+                  }
+                }}
+                className="inline-flex h-10 w-full items-center justify-center rounded-xl bg-zinc-900 px-4 text-xs font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-400"
+              >
+                {qrisPaid ? "Sudah Dibayar" : checkingQris ? "Mengecek..." : "Cek Status Pembayaran"}
+              </button>
 
               <div className="text-xs text-zinc-500">
                 Scan QR menggunakan aplikasi e-wallet atau mobile banking yang mendukung QRIS.

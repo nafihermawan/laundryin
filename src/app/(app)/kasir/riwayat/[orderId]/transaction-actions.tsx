@@ -44,6 +44,7 @@ export function TransactionActions({
   total,
 }: Props) {
   const router = useRouter();
+  const showQrisDebug = process.env.NEXT_PUBLIC_QRIS_DEBUG === "true";
   const [status, setStatus] = useState(getLaundryStatus(currentStatus));
   const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [payingOpen, setPayingOpen] = useState(false);
@@ -458,41 +459,46 @@ export function TransactionActions({
                           Kedaluwarsa: {new Date(qrisDynamic.expiresAt).toLocaleString("id-ID")}
                         </div>
                       ) : null}
-                      {qrisDynamic.imageUrl ? (
-                        <div className="w-full rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
-                          <div className="text-xs font-medium text-zinc-600">QR Code Image URL (Sandbox Simulator)</div>
-                          <div className="mt-2 flex items-center gap-2">
-                            <input
-                              value={qrisDynamic.imageUrl}
-                              readOnly
-                              className="h-10 w-full rounded-xl border border-zinc-200 bg-white px-3 text-xs text-zinc-700 outline-none"
-                            />
-                            <button
-                              type="button"
-                              onClick={async () => {
-                                try {
-                                  const url = qrisDynamic.imageUrl;
-                                  if (!url) return;
-                                  await navigator.clipboard.writeText(url);
-                                } catch {}
-                              }}
-                              className="inline-flex h-10 shrink-0 items-center justify-center rounded-xl border border-zinc-200 bg-white px-3 text-xs font-semibold text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
-                            >
-                              Copy
-                            </button>
-                          </div>
-                          {(() => {
-                            const expiredByTime =
-                              !qrisPaid &&
-                              typeof qrisDynamic.expiresAt === "string" &&
-                              Number.isFinite(new Date(qrisDynamic.expiresAt).getTime()) &&
-                              new Date(qrisDynamic.expiresAt).getTime() < Date.now();
-                            const isExpired =
-                              qrisDynamicStatus === "expired" ||
-                              qrisDynamicStatus === "failed" ||
-                              expiredByTime;
-                            if (!isExpired || qrisPaid) return null;
-                            return (
+                      {(() => {
+                        const expiredByTime =
+                          !qrisPaid &&
+                          typeof qrisDynamic.expiresAt === "string" &&
+                          Number.isFinite(new Date(qrisDynamic.expiresAt).getTime()) &&
+                          new Date(qrisDynamic.expiresAt).getTime() < Date.now();
+                        const isExpired =
+                          qrisDynamicStatus === "expired" ||
+                          qrisDynamicStatus === "failed" ||
+                          expiredByTime;
+                        return (
+                          <div className="w-full">
+                            {showQrisDebug && qrisDynamic.imageUrl ? (
+                              <div className="mb-2 w-full rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
+                                <div className="text-xs font-medium text-zinc-600">
+                                  QR Code Image URL (Sandbox Simulator)
+                                </div>
+                                <div className="mt-2 flex items-center gap-2">
+                                  <input
+                                    value={qrisDynamic.imageUrl}
+                                    readOnly
+                                    className="h-10 w-full rounded-xl border border-zinc-200 bg-white px-3 text-xs text-zinc-700 outline-none"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      try {
+                                        const url = qrisDynamic.imageUrl;
+                                        if (!url) return;
+                                        await navigator.clipboard.writeText(url);
+                                      } catch {}
+                                    }}
+                                    className="inline-flex h-10 shrink-0 items-center justify-center rounded-xl border border-zinc-200 bg-white px-3 text-xs font-semibold text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
+                                  >
+                                    Copy
+                                  </button>
+                                </div>
+                              </div>
+                            ) : null}
+                            {isExpired && !qrisPaid ? (
                               <button
                                 type="button"
                                 disabled={isGeneratingQris}
@@ -504,7 +510,10 @@ export function TransactionActions({
                                       setQrisPaid(false);
                                       setQrisDynamic(res.data);
                                       setQrisDynamicStatus("pending");
-                                      setToast({ type: "success", message: "QR baru berhasil dibuat. Silakan scan ulang." });
+                                      setToast({
+                                        type: "success",
+                                        message: "QR baru berhasil dibuat. Silakan scan ulang.",
+                                      });
                                       router.refresh();
                                       return;
                                     }
@@ -513,48 +522,53 @@ export function TransactionActions({
                                     setIsGeneratingQris(false);
                                   }
                                 }}
-                                className="mt-2 inline-flex h-10 w-full items-center justify-center rounded-xl bg-emerald-600 px-4 text-xs font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-400"
+                                className="inline-flex h-10 w-full items-center justify-center rounded-xl bg-emerald-600 px-4 text-xs font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-400"
                               >
                                 {isGeneratingQris ? "Membuat QR..." : "Generate QR Baru"}
                               </button>
-                            );
-                          })()}
-                          <button
-                            type="button"
-                            disabled={isCheckingQris || qrisPaid}
-                            onClick={async () => {
-                              if (!qrisDynamic) return;
-                              setIsCheckingQris(true);
-                              try {
-                                const res = await checkQrisDynamicPaymentStatus(qrisDynamic.paymentId);
-                                if (res.success) {
-                                  setQrisDynamicStatus(res.data.status);
-                                  if (res.data.status === "paid") {
-                                    setQrisPaid(true);
-                                    setToast({ type: "success", message: "Pembayaran QRIS berhasil (lunas)." });
-                                  } else if (res.data.status === "pending") {
-                                    setToast({ type: "success", message: "Pembayaran masih pending. Silakan cek lagi." });
-                                  } else if (res.data.status === "expired") {
-                                    setToast({ type: "error", message: "QRIS sudah kedaluwarsa." });
-                                  } else if (res.data.status === "failed") {
-                                    setToast({ type: "error", message: "Pembayaran gagal/ditolak." });
+                            ) : null}
+                            <button
+                              type="button"
+                              disabled={isCheckingQris || qrisPaid}
+                              onClick={async () => {
+                                if (!qrisDynamic) return;
+                                setIsCheckingQris(true);
+                                try {
+                                  const res = await checkQrisDynamicPaymentStatus(qrisDynamic.paymentId);
+                                  if (res.success) {
+                                    setQrisDynamicStatus(res.data.status);
+                                    if (res.data.status === "paid") {
+                                      setQrisPaid(true);
+                                      setToast({ type: "success", message: "Pembayaran QRIS berhasil (lunas)." });
+                                    } else if (res.data.status === "pending") {
+                                      setToast({
+                                        type: "success",
+                                        message: "Pembayaran masih pending. Silakan cek lagi.",
+                                      });
+                                    } else if (res.data.status === "expired") {
+                                      setToast({ type: "error", message: "QRIS sudah kedaluwarsa." });
+                                    } else if (res.data.status === "failed") {
+                                      setToast({ type: "error", message: "Pembayaran gagal/ditolak." });
+                                    } else {
+                                      setToast({ type: "success", message: `Status: ${res.data.status}` });
+                                    }
+                                    router.refresh();
                                   } else {
-                                    setToast({ type: "success", message: `Status: ${res.data.status}` });
+                                    setToast({ type: "error", message: res.error || "Gagal cek status pembayaran." });
                                   }
-                                  router.refresh();
-                                } else {
-                                  setToast({ type: "error", message: res.error || "Gagal cek status pembayaran." });
+                                } finally {
+                                  setIsCheckingQris(false);
                                 }
-                              } finally {
-                                setIsCheckingQris(false);
-                              }
-                            }}
-                            className="mt-2 inline-flex h-10 w-full items-center justify-center rounded-xl bg-zinc-900 px-4 text-xs font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-400"
-                          >
-                            {qrisPaid ? "Sudah Dibayar" : isCheckingQris ? "Mengecek..." : "Cek Status Pembayaran"}
-                          </button>
-                        </div>
-                      ) : null}
+                              }}
+                              className={`${
+                                isExpired && !qrisPaid ? "mt-2 " : ""
+                              }inline-flex h-10 w-full items-center justify-center rounded-xl bg-zinc-900 px-4 text-xs font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-400`}
+                            >
+                              {qrisPaid ? "Sudah Dibayar" : isCheckingQris ? "Mengecek..." : "Cek Status Pembayaran"}
+                            </button>
+                          </div>
+                        );
+                      })()}
 
                     </>
                   ) : isGeneratingQris ? (
