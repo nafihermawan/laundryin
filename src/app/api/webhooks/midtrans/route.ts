@@ -38,6 +38,12 @@ export async function POST(req: Request) {
   if (shouldMarkPaid) {
     updatePayload.status = "paid";
     updatePayload.paid_at = new Date().toISOString();
+  } else if (transactionStatus === "expire") {
+    updatePayload.status = "expired";
+    updatePayload.paid_at = null;
+  } else if (transactionStatus === "cancel" || transactionStatus === "deny") {
+    updatePayload.status = "failed";
+    updatePayload.paid_at = null;
   }
 
   const admin = createAdminClient();

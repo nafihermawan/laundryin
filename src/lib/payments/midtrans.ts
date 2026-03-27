@@ -39,11 +39,37 @@ function getBasicAuthHeader(serverKey: string) {
   return `Basic ${token}`;
 }
 
+function formatMidtransErrorMessage(status: number, bodyText: string) {
+  try {
+    const obj = JSON.parse(bodyText) as Record<string, unknown>;
+    const statusMessage = typeof obj.status_message === "string" ? obj.status_message : null;
+    const statusCode = typeof obj.status_code === "string" ? obj.status_code : null;
+    const validationMessages = Array.isArray(obj.validation_messages)
+      ? obj.validation_messages.filter((v): v is string => typeof v === "string")
+      : [];
+    const extra = validationMessages.length ? ` | ${validationMessages.join(" | ")}` : "";
+    if (statusMessage) {
+      return `Midtrans QRIS gagal: ${statusMessage}${statusCode ? ` (code ${statusCode})` : ""} (HTTP ${status})${extra}`;
+    }
+  } catch {}
+
+  const trimmed = bodyText.trim();
+  return `Midtrans QRIS gagal (HTTP ${status}): ${trimmed || "Unknown error"}`;
+}
+
 export async function createMidtransQrisCharge(
   input: CreateMidtransQrisChargeInput,
 ): Promise<CreateMidtransQrisChargeResult> {
   if (!env.MIDTRANS_SERVER_KEY) {
     throw new Error("MIDTRANS_SERVER_KEY belum diset");
+  }
+
+  const isProd = env.MIDTRANS_IS_PRODUCTION === "true";
+  if (isProd && env.MIDTRANS_SERVER_KEY.startsWith("SB-")) {
+    throw new Error("Konfigurasi Midtrans tidak valid: MIDTRANS_IS_PRODUCTION=true tapi MIDTRANS_SERVER_KEY sandbox");
+  }
+  if (!isProd && !env.MIDTRANS_SERVER_KEY.startsWith("SB-")) {
+    throw new Error("Konfigurasi Midtrans tidak valid: MIDTRANS_IS_PRODUCTION!=true tapi MIDTRANS_SERVER_KEY bukan sandbox");
   }
 
   const amountInt = Math.round(input.grossAmount);
@@ -70,10 +96,18 @@ export async function createMidtransQrisCharge(
 
   const bodyText = await res.text();
   if (!res.ok) {
-    throw new Error(`Midtrans create QRIS gagal (${res.status}): ${bodyText}`);
+    throw new Error(formatMidtransErrorMessage(res.status, bodyText));
   }
 
   const data = JSON.parse(bodyText) as MidtransQrisChargeResponse;
+  if (data.status_code !== "201") {
+    throw new Error(
+      `Midtrans QRIS gagal: ${data.status_message || "Unknown error"} (code ${data.status_code || "?"})`,
+    );
+  }
+  if (!data.transaction_id || typeof data.transaction_id !== "string") {
+    throw new Error("Midtrans tidak mengembalikan transaction_id");
+  }
   const qrString = data.qr_string;
   if (!qrString || typeof qrString !== "string") {
     throw new Error("Midtrans tidak mengembalikan qr_string");
