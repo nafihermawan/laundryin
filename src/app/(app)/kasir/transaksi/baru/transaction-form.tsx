@@ -123,6 +123,10 @@ export function TransactionForm() {
   } | null>(null);
   const [qrisPaid, setQrisPaid] = useState(false);
   const [checkingQris, setCheckingQris] = useState(false);
+  const [qrisNotice, setQrisNotice] = useState<{
+    type: "info" | "error" | "success";
+    message: string;
+  } | null>(null);
   const showQrisDebug = process.env.NEXT_PUBLIC_QRIS_DEBUG === "true";
   const simulatorImageUrl = qrisDynamic?.imageUrl ?? null;
 
@@ -254,6 +258,7 @@ export function TransactionForm() {
       setIsSaving(false);
       if (result.data.qris) {
         setQrisPaid(false);
+        setQrisNotice(null);
         setQrisDynamic({
           orderNo: result.data.orderNo,
           paymentId: result.data.qris.paymentId,
@@ -753,7 +758,10 @@ export function TransactionForm() {
               </div>
               <button
                 type="button"
-                onClick={() => setQrisDynamic(null)}
+                onClick={() => {
+                  setQrisDynamic(null);
+                  setQrisNotice(null);
+                }}
                 className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-zinc-200 text-zinc-600 transition hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
                 aria-label="Tutup"
               >
@@ -779,6 +787,20 @@ export function TransactionForm() {
                 {qrisDynamic.expiresAt ? (
                   <div className="text-xs text-zinc-500">
                     Kedaluwarsa: {new Date(qrisDynamic.expiresAt).toLocaleString("id-ID")}
+                  </div>
+                ) : null}
+
+                {qrisNotice ? (
+                  <div
+                    className={`w-full rounded-xl border px-3 py-2 text-xs ${
+                      qrisNotice.type === "success"
+                        ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700"
+                        : qrisNotice.type === "error"
+                          ? "border-red-500/30 bg-red-500/10 text-red-700"
+                          : "border-amber-500/30 bg-amber-500/10 text-amber-700"
+                    }`}
+                  >
+                    {qrisNotice.message}
                   </div>
                 ) : null}
               </div>
@@ -816,23 +838,24 @@ export function TransactionForm() {
                   setCheckingQris(true);
                   setSaveError(null);
                   setSaveSuccess(null);
+                  setQrisNotice(null);
                   try {
                     const res = await checkQrisDynamicPaymentStatus(qrisDynamic.paymentId);
                     if (res.success) {
                       if (res.data.status === "paid") {
                         setQrisPaid(true);
-                        setSaveSuccess("Pembayaran QRIS berhasil (lunas).");
+                        setQrisNotice({ type: "success", message: "Pembayaran QRIS berhasil (lunas)." });
                       } else if (res.data.status === "pending") {
-                        setSaveSuccess("Pembayaran masih pending. Silakan coba cek lagi.");
+                        setQrisNotice({ type: "info", message: "Pembayaran masih pending. Silakan coba cek lagi." });
                       } else if (res.data.status === "expired") {
-                        setSaveError("QRIS sudah kedaluwarsa.");
+                        setQrisNotice({ type: "error", message: "QRIS sudah kedaluwarsa." });
                       } else if (res.data.status === "failed") {
-                        setSaveError("Pembayaran gagal/ditolak.");
+                        setQrisNotice({ type: "error", message: "Pembayaran gagal/ditolak." });
                       } else {
-                        setSaveSuccess(`Status: ${res.data.status}`);
+                        setQrisNotice({ type: "info", message: `Status: ${res.data.status}` });
                       }
                     } else {
-                      setSaveError(res.error || "Gagal cek status pembayaran.");
+                      setQrisNotice({ type: "error", message: res.error || "Gagal cek status pembayaran." });
                     }
                   } finally {
                     setCheckingQris(false);
@@ -851,7 +874,10 @@ export function TransactionForm() {
             <div className="flex items-center justify-end gap-2 border-t border-zinc-100 p-5">
               <button
                 type="button"
-                onClick={() => setQrisDynamic(null)}
+                onClick={() => {
+                  setQrisDynamic(null);
+                  setQrisNotice(null);
+                }}
                 className="inline-flex h-10 items-center justify-center rounded-xl border border-zinc-200 bg-white px-4 text-sm font-medium text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
               >
                 Tutup
