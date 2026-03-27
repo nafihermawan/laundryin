@@ -235,6 +235,35 @@ export function TransactionActions({
     router.refresh();
   }, [payingOpen, qrisPaid, router]);
 
+  useEffect(() => {
+    if (!payingOpen) return;
+    if (payMethod !== "qris_dynamic") return;
+    if (qrisPaid) return;
+    if (qrisDynamic) return;
+    if (isGeneratingQris) return;
+    let cancelled = false;
+    async function generate() {
+      setIsGeneratingQris(true);
+      try {
+        const res = await startQrisDynamicForOrder(orderId);
+        if (cancelled) return;
+        if (res.success) {
+          setQrisPaid(false);
+          setQrisDynamic(res.data);
+          setQrisDynamicStatus("pending");
+          return;
+        }
+        setToast({ type: "error", message: res.error || "Gagal membuat QRIS dinamis." });
+      } finally {
+        if (!cancelled) setIsGeneratingQris(false);
+      }
+    }
+    generate();
+    return () => {
+      cancelled = true;
+    };
+  }, [isGeneratingQris, orderId, payMethod, payingOpen, qrisDynamic, qrisPaid]);
+
   return (
     <div className="flex flex-col gap-4">
       {toast ? (
@@ -528,40 +557,32 @@ export function TransactionActions({
                       ) : null}
 
                     </>
-                  ) : (
-                    <div className="text-xs text-zinc-500">
-                      Klik Generate untuk membuat QRIS dinamis, lalu customer scan untuk bayar.
-                    </div>
-                  )}
+                  ) : isGeneratingQris ? (
+                    <div className="text-xs text-zinc-500">Membuat QRIS dinamis...</div>
+                  ) : null}
                 </div>
               ) : null}
             </div>
 
-            <div className="flex items-center justify-end gap-2 border-t border-zinc-100 p-5">
-              <button
-                type="button"
-                onClick={() => setPayingOpen(false)}
-                className="inline-flex h-10 items-center justify-center rounded-xl border border-zinc-200 bg-white px-4 text-sm font-medium text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                onClick={handlePayConfirm}
-                disabled={isPaying || isGeneratingQris}
-                className="inline-flex h-10 items-center justify-center rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-60"
-              >
-                {payMethod === "qris_dynamic"
-                  ? isGeneratingQris
-                    ? "Membuat QR..."
-                    : qrisDynamic
-                      ? "Generate Ulang"
-                      : "Generate QR"
-                  : isPaying
-                    ? "Memproses..."
-                    : "Konfirmasi Bayar"}
-              </button>
-            </div>
+            {payMethod !== "qris_dynamic" ? (
+              <div className="flex items-center justify-end gap-2 border-t border-zinc-100 p-5">
+                <button
+                  type="button"
+                  onClick={() => setPayingOpen(false)}
+                  className="inline-flex h-10 items-center justify-center rounded-xl border border-zinc-200 bg-white px-4 text-sm font-medium text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  onClick={handlePayConfirm}
+                  disabled={isPaying || isGeneratingQris}
+                  className="inline-flex h-10 items-center justify-center rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-60"
+                >
+                  {isPaying ? "Memproses..." : "Konfirmasi Bayar"}
+                </button>
+              </div>
+            ) : null}
           </div>
         </div>
       ) : null}
