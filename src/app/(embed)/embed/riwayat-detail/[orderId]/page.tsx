@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { HeightSender } from "../../height-sender";
 import { TransactionActions } from "@/app/(app)/kasir/riwayat/[orderId]/transaction-actions";
 import { PrintNotaButton } from "./print-nota-button";
+import { CloseEmbedButton } from "./close-embed-button";
 
 function formatIDR(value: number) {
   return new Intl.NumberFormat("id-ID", {
@@ -245,6 +246,12 @@ export default async function RiwayatDetailEmbedPage({
                 )}
               </div>
             </div>
+          </div>
+        </div>
+
+        <div className="sticky bottom-0 z-10 border-t border-zinc-100 bg-white p-4">
+          <div className="flex items-center justify-end">
+            <CloseEmbedButton />
           </div>
         </div>
       </div>

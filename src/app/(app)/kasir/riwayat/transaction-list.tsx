@@ -74,6 +74,14 @@ export function TransactionList({ initialTransactions }: { initialTransactions: 
         return;
       }
 
+      if (record.type === "embed:close") {
+        const source = event.source as Window | null;
+        if (detailFrameRef.current?.contentWindow && source === detailFrameRef.current.contentWindow) {
+          setDetailOrder(null);
+        }
+        return;
+      }
+
       if (record.type === "riwayat:filters") {
         const source = event.source as Window | null;
         if (filterFrameRef.current?.contentWindow && source !== filterFrameRef.current.contentWindow) return;
@@ -254,7 +262,6 @@ export function TransactionList({ initialTransactions }: { initialTransactions: 
                       <button
                         type="button"
                         onClick={() => {
-                          setDetailHeight(null);
                           setDetailOrder(t);
                         }}
                         className="block w-full rounded-lg text-left outline-none transition hover:bg-zinc-50 focus:bg-zinc-50 focus:ring-4 focus:ring-sky-400/10"
@@ -369,14 +376,12 @@ export function TransactionList({ initialTransactions }: { initialTransactions: 
             <div
               className="w-full max-w-2xl overflow-hidden rounded-2xl shadow-xl"
               style={{
-                maxHeight: maxModalHeight ? `${maxModalHeight}px` : "85vh",
-                WebkitOverflowScrolling: "touch",
+                height: maxModalHeight ? `${maxModalHeight}px` : "85vh",
               }}
             >
               <iframe
                 src={`/embed/riwayat-detail/${detailOrder.id}`}
                 className="h-full w-full rounded-2xl bg-transparent"
-                style={{ height: maxModalHeight ? `${maxModalHeight}px` : "85vh" }}
                 frameBorder={0}
                 scrolling="yes"
                 ref={detailFrameRef}
