@@ -97,10 +97,10 @@ export default async function RiwayatDetailEmbedPage({
     | null;
 
   return (
-    <div id="embed-root" className="w-full">
+    <div id="embed-root" className="w-full h-full flex flex-col">
       <HeightSender />
-      <div className="w-full rounded-2xl border border-zinc-200 bg-white shadow-xl">
-        <div className="flex items-start justify-between gap-4 border-b border-zinc-100 p-5">
+      <div className="w-full h-full flex flex-col rounded-2xl border border-zinc-200 bg-white shadow-xl overflow-hidden max-h-[85vh]">
+        <div className="flex-none flex items-start justify-between gap-4 border-b border-zinc-100 p-5 bg-white z-10 sticky top-0">
           <div className="flex flex-col gap-1">
             <div className="text-sm font-semibold text-zinc-900">Detail Transaksi</div>
             <div className="text-xs text-zinc-500">{order.order_no}</div>
@@ -108,7 +108,8 @@ export default async function RiwayatDetailEmbedPage({
           <PrintNotaButton orderId={order.id} />
         </div>
 
-        <div className="grid gap-4 p-5 lg:grid-cols-3">
+        <div className="flex-1 overflow-y-auto">
+          <div className="grid gap-4 p-5 lg:grid-cols-3">
           <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm lg:col-span-2">
             <div className="flex flex-col gap-3">
               <div className="flex items-start justify-between gap-4">
@@ -248,6 +249,7 @@ export default async function RiwayatDetailEmbedPage({
           </div>
         </div>
       </div>
+    </div>
     </div>
   );
 }
