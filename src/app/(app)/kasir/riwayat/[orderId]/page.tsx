@@ -375,60 +375,63 @@ export default async function TransactionDetailPage({
                         {p.reference_no ? <div className="mt-1 text-xs text-zinc-600">Ref: {p.reference_no}</div> : null}
                         {p.notes ? <div className="mt-1 text-xs text-zinc-600">{p.notes}</div> : null}
                         {p.method === "qris_dynamic" && p.status === "pending" ? (
-                          <>
-                            {qrisImageUrl ? (
-                              <div className="mt-1 text-xs text-zinc-600 break-all">
-                                QR Image URL:{" "}
-                                <a
-                                  href={qrisImageUrl}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="font-medium text-sky-700 hover:text-sky-800"
-                                >
-                                  {qrisImageUrl}
-                                </a>
-                              </div>
-                            ) : null}
-                            {midtransQrCodeUrl ? (
-                              <div className="mt-1 text-xs text-zinc-600 break-all">
-                                Midtrans QR URL:{" "}
-                                <a
-                                  href={midtransQrCodeUrl}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="font-medium text-sky-700 hover:text-sky-800"
-                                >
-                                  {midtransQrCodeUrl}
-                                </a>
-                              </div>
-                            ) : null}
-                            {proxyQrCodeUrl ? (
-                              <div className="mt-1 text-xs text-zinc-600 break-all">
-                                Proxy QR URL:{" "}
-                                <a
-                                  href={proxyQrCodeUrl}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="font-medium text-sky-700 hover:text-sky-800"
-                                >
-                                  {proxyQrCodeUrl}
-                                </a>
-                              </div>
-                            ) : null}
-                            {internalQrUrl ? (
-                              <div className="mt-1 text-xs text-zinc-600 break-all">
-                                QR String PNG:{" "}
-                                <a
-                                  href={internalQrUrl}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="font-medium text-sky-700 hover:text-sky-800"
-                                >
-                                  {internalQrUrl}
-                                </a>
-                              </div>
-                            ) : null}
-                          </>
+                          <div className="mt-2 rounded-xl border border-zinc-200 bg-white p-3">
+                            <div className="text-[11px] font-semibold text-zinc-700">QRIS Tools</div>
+                            <div className="mt-2 grid gap-1.5 text-[11px] text-zinc-600">
+                              {midtransQrCodeUrl ? (
+                                <div className="grid grid-cols-[110px_1fr] items-start gap-2">
+                                  <div className="text-zinc-500">Midtrans QR URL</div>
+                                  <a
+                                    href={midtransQrCodeUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="font-medium text-sky-700 hover:text-sky-800 break-all"
+                                  >
+                                    {midtransQrCodeUrl}
+                                  </a>
+                                </div>
+                              ) : null}
+                              {proxyQrCodeUrl ? (
+                                <div className="grid grid-cols-[110px_1fr] items-start gap-2">
+                                  <div className="text-zinc-500">Proxy QR URL</div>
+                                  <a
+                                    href={proxyQrCodeUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="font-medium text-sky-700 hover:text-sky-800 break-all"
+                                  >
+                                    {proxyQrCodeUrl}
+                                  </a>
+                                </div>
+                              ) : null}
+                              {qrisImageUrl ? (
+                                <div className="grid grid-cols-[110px_1fr] items-start gap-2">
+                                  <div className="text-zinc-500">QR Image URL</div>
+                                  <a
+                                    href={qrisImageUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="font-medium text-sky-700 hover:text-sky-800 break-all"
+                                  >
+                                    {qrisImageUrl}
+                                  </a>
+                                </div>
+                              ) : null}
+                              {internalQrUrl ? (
+                                <div className="grid grid-cols-[110px_1fr] items-start gap-2">
+                                  <div className="text-zinc-500">QR String PNG</div>
+                                  <a
+                                    href={internalQrUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="font-medium text-sky-700 hover:text-sky-800 break-all"
+                                  >
+                                    {internalQrUrl}
+                                  </a>
+                                </div>
+                              ) : null}
+                            </div>
+                          </div>
                         ) : null}
                       </div>
                     );

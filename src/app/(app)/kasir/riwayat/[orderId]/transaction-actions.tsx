@@ -359,9 +359,9 @@ export function TransactionActions({
       </div>
 
       {payingOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
-          <div className="w-full max-w-lg rounded-2xl border border-zinc-200 bg-white shadow-xl">
-            <div className="flex items-start justify-between gap-4 border-b border-zinc-100 p-5">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/30 p-4 sm:items-center">
+          <div className="flex w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-xl max-h-[85vh]">
+            <div className="flex flex-none items-start justify-between gap-4 border-b border-zinc-100 p-5">
               <div className="flex flex-col gap-1">
                 <div className="text-sm font-semibold text-zinc-900">Bayar Order</div>
                 <div className="text-xs text-zinc-500">
@@ -381,7 +381,8 @@ export function TransactionActions({
               </button>
             </div>
 
-            <div className="flex flex-col gap-4 p-5">
+            <div className="flex-1 overflow-auto p-5" style={{ WebkitOverflowScrolling: "touch" }}>
+              <div className="flex flex-col gap-4">
               <div className="flex flex-col gap-1">
                 <div className="text-xs font-medium text-zinc-600">Metode</div>
                 <select
@@ -588,6 +589,7 @@ export function TransactionActions({
                   ) : null}
                 </div>
               ) : null}
+              </div>
             </div>
 
             {payMethod !== "qris_dynamic" ? (
