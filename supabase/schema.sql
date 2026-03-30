@@ -123,7 +123,7 @@ alter table public.payments
   add constraint payments_paidat_status_check
   check (
     (status = 'paid' and paid_at is not null) or
-    (status = 'pending' and paid_at is null)
+    (status in ('pending', 'expired', 'failed') and paid_at is null)
   );
 
 alter table public.payments drop constraint if exists payments_method_check;
@@ -450,6 +450,7 @@ declare
   received_at timestamptz;
   total numeric(12,2);
   pending_payment_id uuid;
+  pending_method text;
   cash_change numeric(12,2);
   merged_notes text;
 begin
@@ -528,17 +529,53 @@ begin
   limit 1;
 
   if pending_payment_id is not null then
-    update public.payments
-    set
-      cash_register_id = shift_id,
-      paid_at = now(),
-      amount = total,
-      method = pay_order.method,
-      status = 'paid',
-      received_by = auth.uid(),
-      reference_no = nullif(btrim(pay_order.reference_no), ''),
-      notes = merged_notes
-    where id = pending_payment_id;
+    select p.method into pending_method
+    from public.payments p
+    where p.id = pending_payment_id;
+
+    if pending_method = 'qris_dynamic' then
+      update public.payments
+      set
+        status = 'expired',
+        paid_at = null
+      where id = pending_payment_id and status = 'pending';
+
+      merged_notes := concat_ws(' | ', merged_notes, format('method_changed_from=%s', pending_method));
+
+      insert into public.payments (
+        order_id,
+        cash_register_id,
+        paid_at,
+        amount,
+        method,
+        status,
+        received_by,
+        reference_no,
+        notes
+      ) values (
+        pay_order.order_id,
+        shift_id,
+        now(),
+        total,
+        pay_order.method,
+        'paid',
+        auth.uid(),
+        nullif(btrim(pay_order.reference_no), ''),
+        merged_notes
+      );
+    else
+      update public.payments
+      set
+        cash_register_id = shift_id,
+        paid_at = now(),
+        amount = total,
+        method = pay_order.method,
+        status = 'paid',
+        received_by = auth.uid(),
+        reference_no = nullif(btrim(pay_order.reference_no), ''),
+        notes = merged_notes
+      where id = pending_payment_id;
+    end if;
   else
     insert into public.payments (
       order_id,

@@ -469,7 +469,8 @@ export function TransactionActions({
                       })()}
                       {qrisDynamic.expiresAt ? (
                         <div className="text-xs text-zinc-500">
-                          Kedaluwarsa: {new Date(qrisDynamic.expiresAt).toLocaleString("id-ID")}
+                          Kedaluwarsa:{" "}
+                          {new Date(qrisDynamic.expiresAt).toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })}
                         </div>
                       ) : null}
                       {(() => {

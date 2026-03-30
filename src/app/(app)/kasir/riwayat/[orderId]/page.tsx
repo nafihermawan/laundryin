@@ -18,6 +18,7 @@ function formatDate(dateStr: string) {
   return new Intl.DateTimeFormat("id-ID", {
     dateStyle: "medium",
     timeStyle: "short",
+    timeZone: "Asia/Jakarta",
   }).format(new Date(dateStr));
 }
 
@@ -50,16 +51,41 @@ function getPaymentMethodLabel(method: string) {
 }
 
 function getPaymentStatusLabel(status: string) {
-  if (status === "paid") return "Paid";
+  if (status === "paid") return "Lunas";
   if (status === "pending") return "Pending";
-  if (status === "expired") return "Expired";
-  if (status === "failed") return "Failed";
+  if (status === "expired") return "Kedaluwarsa";
+  if (status === "failed") return "Gagal";
   return status;
 }
 
 function getMidtransApiBase() {
   const isProd = env.MIDTRANS_IS_PRODUCTION === "true";
   return isProd ? "https://api.midtrans.com" : "https://api.sandbox.midtrans.com";
+}
+
+function parsePaymentNotes(notes: string | null | undefined) {
+  const out: Record<string, string> = {};
+  if (typeof notes !== "string") return out;
+  const parts = notes
+    .split("|")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  for (const part of parts) {
+    const idx = part.indexOf("=");
+    if (idx === -1) continue;
+    const key = part.slice(0, idx).trim();
+    const value = part.slice(idx + 1).trim();
+    if (!key) continue;
+    out[key] = value;
+  }
+  return out;
+}
+
+function toIsoDate(value: unknown) {
+  if (typeof value !== "string") return null;
+  const dt = new Date(value);
+  if (!Number.isFinite(dt.getTime())) return null;
+  return dt.toISOString();
 }
 
 function isUuid(value: string) {
@@ -88,6 +114,7 @@ export default async function TransactionDetailPage({
     status,
     received_at,
     due_at,
+    updated_at,
     ready_at,
     completed_at,
     notes,
@@ -101,6 +128,7 @@ export default async function TransactionDetailPage({
     status,
     received_at,
     due_at,
+    updated_at,
     completed_at,
     notes,
     customer:customers(name, phone),
@@ -197,6 +225,14 @@ export default async function TransactionDetailPage({
   }>;
 
   const isPaid = payments.some((p) => p.status === "paid");
+  const orderMeta = order as unknown as { ready_at?: string | null; updated_at?: string | null };
+  const nowIso = new Date().toISOString();
+  const readyEventTs =
+    typeof orderMeta.ready_at === "string"
+      ? toIsoDate(orderMeta.ready_at)
+      : getLaundryStatus(order.status) === "siap"
+        ? toIsoDate(orderMeta.updated_at)
+        : null;
 
   const customerRaw = (order.customer ?? null) as unknown;
   const customer = (Array.isArray(customerRaw) ? customerRaw[0] : customerRaw) as
@@ -281,6 +317,13 @@ export default async function TransactionDetailPage({
                     {formatDate(order.ready_at)}
                   </div>
                 </div>
+              ) : getLaundryStatus(order.status) === "siap" ? (
+                <div className="rounded-xl border border-zinc-100 bg-zinc-50 px-3 py-2 sm:col-span-2">
+                  <div className="text-xs font-medium text-zinc-500">Siap diambil pada</div>
+                  <div className="mt-1 text-sm font-medium text-sky-700">
+                    {order.updated_at ? formatDate(order.updated_at) : "-"}
+                  </div>
+                </div>
               ) : null}
             </div>
 
@@ -348,11 +391,11 @@ export default async function TransactionDetailPage({
           <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
             <div className="text-base font-semibold tracking-tight">Log Transaksi</div>
             <div className="mt-4 flex flex-col gap-3 text-xs">
-              {order.ready_at ? (
+              {readyEventTs ? (
                 <div className="rounded-xl border border-zinc-100 bg-zinc-50 px-3 py-2">
                   <div className="flex items-center justify-between gap-3">
                     <div className="font-semibold text-zinc-900">Status: Siap Diambil</div>
-                    <span className="text-xs font-medium text-sky-700">{formatDate(order.ready_at)}</span>
+                    <span className="text-xs font-medium text-sky-700">{formatDate(readyEventTs)}</span>
                   </div>
                 </div>
               ) : null}
@@ -372,10 +415,18 @@ export default async function TransactionDetailPage({
                   .slice()
                   .sort((a, b) => String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")))
                   .map((p, idx) => {
+                    const expiresAtIso = toIsoDate(p.qris_expires_at);
+                    const isExpiredByTime =
+                      p.method === "qris_dynamic" &&
+                      p.status === "pending" &&
+                      typeof expiresAtIso === "string" &&
+                      expiresAtIso < nowIso;
+                    const effectiveStatus =
+                      isExpiredByTime ? "expired" : p.status;
                     const statusClasses =
-                      p.status === "paid"
+                      effectiveStatus === "paid"
                         ? "bg-emerald-100 text-emerald-700 border-emerald-200"
-                        : p.status === "expired" || p.status === "failed"
+                        : effectiveStatus === "expired" || effectiveStatus === "failed"
                           ? "bg-zinc-100 text-zinc-700 border-zinc-200"
                           : "bg-amber-100 text-amber-700 border-amber-200";
 
@@ -384,6 +435,16 @@ export default async function TransactionDetailPage({
                       typeof p.provider_ref === "string" && p.provider_ref
                         ? `${getMidtransApiBase()}/v2/qris/${p.provider_ref}/qr-code`
                         : null;
+                    const meta = parsePaymentNotes(p.notes);
+                    const cashReceived = meta.cash_received ? Number(meta.cash_received) : null;
+                    const cashChange = meta.change ? Number(meta.change) : null;
+                    const methodChangedFrom = meta.method_changed_from ?? null;
+                    const showRawNotes =
+                      typeof p.notes === "string" &&
+                      p.notes.length > 0 &&
+                      !(p.method === "cash" && (p.notes.includes("cash_received=") || p.notes.includes("change=")));
+                    const providerStatusText =
+                      isExpiredByTime && p.provider_status === "pending" ? "expired" : p.provider_status;
 
                     return (
                       <div key={idx} className="rounded-xl border border-zinc-100 bg-zinc-50 px-3 py-2">
@@ -392,16 +453,29 @@ export default async function TransactionDetailPage({
                             {getPaymentMethodLabel(p.method)} · {formatIDR(Number(p.amount ?? 0))}
                           </div>
                           <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${statusClasses}`}>
-                            {getPaymentStatusLabel(p.status)}
+                            {getPaymentStatusLabel(effectiveStatus)}
                           </span>
                         </div>
                         <div className="mt-1 text-xs text-zinc-600">
                           {timestamp ? formatDate(timestamp) : "-"}
-                          {p.provider_status ? ` · ${p.provider_status}` : ""}
+                          {providerStatusText ? ` · ${providerStatusText}` : ""}
                         </div>
+                        {methodChangedFrom ? (
+                          <div className="mt-1 text-xs text-zinc-600">
+                            Metode diubah: {getPaymentMethodLabel(methodChangedFrom)} → {getPaymentMethodLabel(p.method)}
+                          </div>
+                        ) : null}
                         {p.reference_no ? <div className="mt-1 text-xs text-zinc-600">Ref: {p.reference_no}</div> : null}
-                        {p.notes ? <div className="mt-1 text-xs text-zinc-600">{p.notes}</div> : null}
-                        {p.method === "qris_dynamic" && p.status === "pending" ? (
+                        {p.method === "cash" && Number.isFinite(cashReceived ?? NaN) ? (
+                          <div className="mt-2 grid grid-cols-2 gap-2 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-xs text-zinc-700">
+                            <div className="text-zinc-500">Diterima</div>
+                            <div className="text-right font-semibold text-zinc-900">{formatIDR(cashReceived ?? 0)}</div>
+                            <div className="text-zinc-500">Kembalian</div>
+                            <div className="text-right font-semibold text-zinc-900">{formatIDR(cashChange ?? 0)}</div>
+                          </div>
+                        ) : null}
+                        {showRawNotes ? <div className="mt-1 text-xs text-zinc-600">{p.notes}</div> : null}
+                        {p.method === "qris_dynamic" && effectiveStatus === "pending" ? (
                           midtransQrCodeUrl ? (
                             <div className="mt-2 rounded-xl border border-zinc-200 bg-white p-3">
                               <div className="text-[11px] font-semibold text-zinc-700">Midtrans QR URL</div>
