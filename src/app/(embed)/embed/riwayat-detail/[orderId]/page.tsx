@@ -60,26 +60,55 @@ export default async function RiwayatDetailEmbedPage({
   const resolvedParams = await Promise.resolve(params);
   const orderKey = resolvedParams.orderId;
 
-  const baseQuery = supabase
-    .from("orders")
-    .select(
-      `
-        id,
-        order_no,
-        status,
-        received_at,
-        due_at,
-        ready_at,
-        completed_at,
-        notes,
-        customer:customers(name, phone),
-        items:order_items(service_name, qty, unit, unit_price, subtotal),
-        payments:payments(id, amount, method, status, paid_at, reference_no, notes, created_at, qris_image_url, qris_expires_at, provider_ref, provider_status)
-      `,
-    );
+  const selectWithReadyAt = `
+    id,
+    order_no,
+    status,
+    received_at,
+    due_at,
+    ready_at,
+    completed_at,
+    notes,
+    customer:customers(name, phone),
+    items:order_items(service_name, qty, unit, unit_price, subtotal),
+    payments:payments(id, amount, method, status, paid_at, reference_no, notes, created_at, qris_image_url, qris_expires_at, provider_ref, provider_status)
+  `;
 
-  const { data: order } = await (isUuid(orderKey) ? baseQuery.eq("id", orderKey) : baseQuery.eq("order_no", orderKey))
-    .maybeSingle();
+  const selectWithoutReadyAt = `
+    id,
+    order_no,
+    status,
+    received_at,
+    due_at,
+    completed_at,
+    notes,
+    customer:customers(name, phone),
+    items:order_items(service_name, qty, unit, unit_price, subtotal),
+    payments:payments(id, amount, method, status, paid_at, reference_no, notes, created_at, qris_image_url, qris_expires_at, provider_ref, provider_status)
+  `;
+
+  const withReadyQuery = isUuid(orderKey)
+    ? supabase.from("orders").select(selectWithReadyAt).eq("id", orderKey)
+    : supabase.from("orders").select(selectWithReadyAt).eq("order_no", orderKey);
+  let { data: order, error } = await withReadyQuery.maybeSingle();
+
+  if (error && typeof error.message === "string" && error.message.toLowerCase().includes("ready_at")) {
+    const withoutReadyQuery = isUuid(orderKey)
+      ? supabase.from("orders").select(selectWithoutReadyAt).eq("id", orderKey)
+      : supabase.from("orders").select(selectWithoutReadyAt).eq("order_no", orderKey);
+    ({ data: order, error } = await withoutReadyQuery.maybeSingle());
+  }
+
+  if (error) {
+    return (
+      <div id="embed-root" className="w-full">
+        <HeightSender />
+        <div className="w-full rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-700 shadow-xl">
+          {error.message}
+        </div>
+      </div>
+    );
+  }
 
   if (!order) {
     return (

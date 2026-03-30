@@ -19,7 +19,10 @@ export async function updateOrderStatus(orderId: string, newStatus: string): Pro
       .select("ready_at")
       .eq("id", orderId)
       .maybeSingle();
-    if (existingError) return actionError(existingError.message);
+    if (existingError) {
+      const msg = typeof existingError.message === "string" ? existingError.message.toLowerCase() : "";
+      if (!msg.includes("ready_at")) return actionError(existingError.message);
+    }
     const currentReadyAt = (existing as unknown as { ready_at?: string | null } | null)?.ready_at ?? null;
     if (!currentReadyAt) {
       updatePayload.ready_at = now;
@@ -185,12 +188,7 @@ export async function startQrisDynamicForOrder(orderId: string): Promise<ActionR
   const pendingPaymentId = (existingPending as unknown as { id?: string } | null)?.id ?? null;
 
   if (pendingPaymentId) {
-    const { error: expireError } = await supabase
-      .from("payments")
-      .update({ status: "expired", paid_at: null })
-      .eq("id", pendingPaymentId)
-      .eq("status", "pending");
-    if (expireError) return actionError(expireError.message);
+    void pendingPaymentId;
   }
 
   const { data: inserted, error: insertError } = await supabase
