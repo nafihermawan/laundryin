@@ -20,6 +20,22 @@ function formatDate(dateStr: string) {
   }).format(new Date(dateStr));
 }
 
+function getPaymentMethodLabel(method: string) {
+  if (method === "cash") return "Cash";
+  if (method === "qris_dynamic") return "QRIS Dinamis";
+  if (method === "qris_manual") return "QRIS Manual";
+  if (method === "transfer") return "Transfer";
+  return method;
+}
+
+function getPaymentStatusLabel(status: string) {
+  if (status === "paid") return "Paid";
+  if (status === "pending") return "Pending";
+  if (status === "expired") return "Expired";
+  if (status === "failed") return "Failed";
+  return status;
+}
+
 function isUuid(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
     value,
@@ -46,10 +62,11 @@ export default async function RiwayatDetailEmbedPage({
         status,
         received_at,
         due_at,
+        completed_at,
         notes,
         customer:customers(name, phone),
         items:order_items(service_name, qty, unit, unit_price, subtotal),
-        payments:payments(amount, method, status, paid_at, reference_no, notes, created_at)
+        payments:payments(amount, method, status, paid_at, reference_no, notes, created_at, qris_image_url, qris_expires_at, provider_ref, provider_status)
       `,
     );
 
@@ -88,9 +105,14 @@ export default async function RiwayatDetailEmbedPage({
     reference_no?: string | null;
     notes?: string | null;
     created_at?: string | null;
+    qris_image_url?: string | null;
+    qris_expires_at?: string | null;
+    provider_ref?: string | null;
+    provider_status?: string | null;
   }>;
 
   const isPaid = payments.some((p) => p.status === "paid");
+  const showQrisDebug = process.env.NEXT_PUBLIC_QRIS_DEBUG === "true";
 
   const customerRaw = (order.customer ?? null) as unknown;
   const customer = (Array.isArray(customerRaw) ? customerRaw[0] : customerRaw) as
@@ -232,36 +254,64 @@ export default async function RiwayatDetailEmbedPage({
             </div>
 
             <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
-              <div className="text-base font-semibold tracking-tight">Pembayaran</div>
+              <div className="text-base font-semibold tracking-tight">Log Transaksi</div>
               <div className="mt-4 flex flex-col gap-3 text-sm">
+                {order.completed_at ? (
+                  <div className="rounded-xl border border-zinc-100 bg-zinc-50 px-3 py-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="font-semibold text-zinc-900">Cucian Diambil</div>
+                      <span className="text-xs font-medium text-emerald-700">{formatDate(order.completed_at)}</span>
+                    </div>
+                  </div>
+                ) : null}
                 {payments.length === 0 ? (
-                  <div className="text-sm text-zinc-500">Belum ada data pembayaran.</div>
+                  <div className="text-sm text-zinc-500">Belum ada aktivitas pembayaran.</div>
                 ) : (
                   payments
                     .slice()
                     .sort((a, b) => String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")))
-                    .map((p, idx) => (
-                      <div key={idx} className="rounded-xl border border-zinc-100 bg-zinc-50 px-3 py-2">
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="font-semibold text-zinc-900">{formatIDR(Number(p.amount ?? 0))}</div>
-                          <span
-                            className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${
-                              p.status === "paid"
-                                ? "bg-emerald-100 text-emerald-700 border-emerald-200"
-                                : "bg-amber-100 text-amber-700 border-amber-200"
-                            }`}
-                          >
-                            {p.status === "paid" ? "Paid" : "Pending"}
-                          </span>
+                    .map((p, idx) => {
+                      const statusClasses =
+                        p.status === "paid"
+                          ? "bg-emerald-100 text-emerald-700 border-emerald-200"
+                          : p.status === "expired" || p.status === "failed"
+                            ? "bg-zinc-100 text-zinc-700 border-zinc-200"
+                            : "bg-amber-100 text-amber-700 border-amber-200";
+                      const timestamp = p.paid_at || p.created_at;
+                      const qrisImageUrl = typeof p.qris_image_url === "string" ? p.qris_image_url : null;
+
+                      return (
+                        <div key={idx} className="rounded-xl border border-zinc-100 bg-zinc-50 px-3 py-2">
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="font-semibold text-zinc-900">
+                              {getPaymentMethodLabel(p.method)} · {formatIDR(Number(p.amount ?? 0))}
+                            </div>
+                            <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${statusClasses}`}>
+                              {getPaymentStatusLabel(p.status)}
+                            </span>
+                          </div>
+                          <div className="mt-1 text-xs text-zinc-600">
+                            {timestamp ? formatDate(timestamp) : "-"}
+                            {p.provider_status ? ` · ${p.provider_status}` : ""}
+                          </div>
+                          {p.reference_no ? <div className="mt-1 text-xs text-zinc-600">Ref: {p.reference_no}</div> : null}
+                          {p.notes ? <div className="mt-1 text-xs text-zinc-600">{p.notes}</div> : null}
+                          {showQrisDebug && p.method === "qris_dynamic" && qrisImageUrl ? (
+                            <div className="mt-1 text-xs text-zinc-600 break-all">
+                              QR Image URL:{" "}
+                              <a
+                                href={qrisImageUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="font-medium text-sky-700 hover:text-sky-800"
+                              >
+                                {qrisImageUrl}
+                              </a>
+                            </div>
+                          ) : null}
                         </div>
-                        <div className="mt-1 text-xs text-zinc-600">
-                          {p.method}
-                          {p.paid_at ? ` · ${formatDate(p.paid_at)}` : ""}
-                        </div>
-                        {p.reference_no ? <div className="mt-1 text-xs text-zinc-600">Ref: {p.reference_no}</div> : null}
-                        {p.notes ? <div className="mt-1 text-xs text-zinc-600">{p.notes}</div> : null}
-                      </div>
-                    ))
+                      );
+                    })
                 )}
               </div>
             </div>
