@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { createClient } from "@/lib/supabase/server";
+import { env } from "@/lib/env";
 
 import { TransactionActions } from "./transaction-actions";
 
@@ -53,6 +54,11 @@ function getPaymentStatusLabel(status: string) {
   if (status === "expired") return "Expired";
   if (status === "failed") return "Failed";
   return status;
+}
+
+function getMidtransApiBase() {
+  const isProd = env.MIDTRANS_IS_PRODUCTION === "true";
+  return isProd ? "https://api.midtrans.com" : "https://api.sandbox.midtrans.com";
 }
 
 function isUuid(value: string) {
@@ -174,7 +180,6 @@ export default async function TransactionDetailPage({
   }>;
 
   const isPaid = payments.some((p) => p.status === "paid");
-  const showQrisDebug = process.env.NEXT_PUBLIC_QRIS_DEBUG === "true";
 
   const customerRaw = (order.customer ?? null) as unknown;
   const customer = (Array.isArray(customerRaw) ? customerRaw[0] : customerRaw) as
@@ -344,6 +349,14 @@ export default async function TransactionDetailPage({
                     const timestamp = p.paid_at || p.created_at;
                     const qrisImageUrl = typeof p.qris_image_url === "string" ? p.qris_image_url : null;
                     const internalQrUrl = p.id ? `/api/qris/${encodeURIComponent(p.id)}/qr` : null;
+                    const midtransQrCodeUrl =
+                      typeof p.provider_ref === "string" && p.provider_ref
+                        ? `${getMidtransApiBase()}/v2/qris/${p.provider_ref}/qr-code`
+                        : null;
+                    const proxyQrCodeUrl =
+                      typeof p.provider_ref === "string" && p.provider_ref
+                        ? `/v2/qris/${encodeURIComponent(p.provider_ref)}/qr-code`
+                        : null;
 
                     return (
                       <div key={idx} className="rounded-xl border border-zinc-100 bg-zinc-50 px-3 py-2">
@@ -361,7 +374,7 @@ export default async function TransactionDetailPage({
                         </div>
                         {p.reference_no ? <div className="mt-1 text-xs text-zinc-600">Ref: {p.reference_no}</div> : null}
                         {p.notes ? <div className="mt-1 text-xs text-zinc-600">{p.notes}</div> : null}
-                        {showQrisDebug && p.method === "qris_dynamic" && p.status === "pending" ? (
+                        {p.method === "qris_dynamic" && p.status === "pending" ? (
                           <>
                             {qrisImageUrl ? (
                               <div className="mt-1 text-xs text-zinc-600 break-all">
@@ -376,9 +389,35 @@ export default async function TransactionDetailPage({
                                 </a>
                               </div>
                             ) : null}
+                            {midtransQrCodeUrl ? (
+                              <div className="mt-1 text-xs text-zinc-600 break-all">
+                                Midtrans QR URL:{" "}
+                                <a
+                                  href={midtransQrCodeUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="font-medium text-sky-700 hover:text-sky-800"
+                                >
+                                  {midtransQrCodeUrl}
+                                </a>
+                              </div>
+                            ) : null}
+                            {proxyQrCodeUrl ? (
+                              <div className="mt-1 text-xs text-zinc-600 break-all">
+                                Proxy QR URL:{" "}
+                                <a
+                                  href={proxyQrCodeUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="font-medium text-sky-700 hover:text-sky-800"
+                                >
+                                  {proxyQrCodeUrl}
+                                </a>
+                              </div>
+                            ) : null}
                             {internalQrUrl ? (
                               <div className="mt-1 text-xs text-zinc-600 break-all">
-                                Simulator QR URL:{" "}
+                                QR String PNG:{" "}
                                 <a
                                   href={internalQrUrl}
                                   target="_blank"
