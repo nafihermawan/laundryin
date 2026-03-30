@@ -1,6 +1,11 @@
 alter table public.orders
   add column if not exists ready_at timestamptz;
 
+alter table public.payments drop constraint if exists payments_status_check;
+alter table public.payments
+  add constraint payments_status_check
+  check (status in ('paid', 'pending', 'expired', 'failed'));
+
 alter table public.payments drop constraint if exists payments_paidat_status_check;
 alter table public.payments
   add constraint payments_paidat_status_check
@@ -174,4 +179,3 @@ begin
   end if;
 end;
 $$;
-

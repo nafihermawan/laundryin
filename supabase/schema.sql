@@ -118,6 +118,11 @@ alter table public.payments
 alter table public.payments
   alter column paid_at drop default;
 
+alter table public.payments drop constraint if exists payments_status_check;
+alter table public.payments
+  add constraint payments_status_check
+  check (status in ('paid', 'pending', 'expired', 'failed'));
+
 alter table public.payments drop constraint if exists payments_paidat_status_check;
 alter table public.payments
   add constraint payments_paidat_status_check
