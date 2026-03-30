@@ -4,9 +4,15 @@ import { useState } from "react";
 import { HeightSender } from "../height-sender";
 
 type Status = "semua" | "diterima" | "siap" | "diambil";
+type PaymentStatus = "semua" | "paid" | "unpaid";
 
 function normalizeStatus(value: string | null): Status {
   if (value === "diterima" || value === "siap" || value === "diambil") return value;
+  return "semua";
+}
+
+function normalizePaymentStatus(value: string | null): PaymentStatus {
+  if (value === "paid" || value === "unpaid") return value;
   return "semua";
 }
 
@@ -17,20 +23,22 @@ function normalizeDate(value: string | null): string {
 
 export default function RiwayatFilterEmbedPage() {
   const [initial] = useState(() => {
-    if (typeof window === "undefined") return { status: "semua" as Status, from: "", to: "" };
+    if (typeof window === "undefined") return { status: "semua" as Status, payment: "semua" as PaymentStatus, from: "", to: "" };
     const sp = new URLSearchParams(window.location.search);
     return {
       status: normalizeStatus(sp.get("status")),
+      payment: normalizePaymentStatus(sp.get("payment")),
       from: normalizeDate(sp.get("from")),
       to: normalizeDate(sp.get("to")),
     };
   });
 
   const [status, setStatus] = useState<Status>(initial.status);
+  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>(initial.payment);
   const [dateFrom, setDateFrom] = useState<string>(initial.from);
   const [dateTo, setDateTo] = useState<string>(initial.to);
 
-  function postFilters(next: { status: Status; dateFrom: string; dateTo: string }) {
+  function postFilters(next: { status: Status; paymentStatus: PaymentStatus; dateFrom: string; dateTo: string }) {
     window.parent.postMessage({ type: "riwayat:filters", ...next }, "*");
   }
 
@@ -54,6 +62,19 @@ export default function RiwayatFilterEmbedPage() {
               <option value="diterima">Diterima</option>
               <option value="siap">Siap Diambil</option>
               <option value="diambil">Diambil</option>
+            </select>
+          </label>
+
+          <label className="flex flex-col gap-2">
+            <span className="text-xs font-medium text-zinc-600">Status Bayar</span>
+            <select
+              value={paymentStatus}
+              onChange={(e) => setPaymentStatus(normalizePaymentStatus(e.target.value))}
+              className="h-10 rounded-xl border border-zinc-200 bg-white px-3 text-sm focus:border-sky-400 focus:outline-none focus:ring-4 focus:ring-sky-400/10"
+            >
+              <option value="semua">Semua</option>
+              <option value="paid">Sudah Bayar</option>
+              <option value="unpaid">Belum Bayar</option>
             </select>
           </label>
 
@@ -82,14 +103,14 @@ export default function RiwayatFilterEmbedPage() {
         <div className="flex items-center justify-end gap-2 border-t border-zinc-100 p-5">
           <button
             type="button"
-            onClick={() => postFilters({ status: "semua", dateFrom: "", dateTo: "" })}
+            onClick={() => postFilters({ status: "semua", paymentStatus: "semua", dateFrom: "", dateTo: "" })}
             className="inline-flex h-10 items-center justify-center rounded-xl border border-zinc-200 bg-white px-4 text-sm font-medium text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
           >
             Hapus Filter
           </button>
           <button
             type="button"
-            onClick={() => postFilters({ status, dateFrom, dateTo })}
+            onClick={() => postFilters({ status, paymentStatus, dateFrom, dateTo })}
             className="inline-flex h-10 items-center justify-center rounded-xl bg-sky-500 px-4 text-sm font-semibold text-white transition hover:bg-sky-600"
           >
             Terapkan

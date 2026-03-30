@@ -21,6 +21,7 @@ export function TransactionList({ initialTransactions }: { initialTransactions: 
   const [isPending] = useTransition();
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("semua");
+  const [filterPaymentStatus, setFilterPaymentStatus] = useState<"semua" | "paid" | "unpaid">("semua");
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
   const [page, setPage] = useState(1);
@@ -87,10 +88,12 @@ export function TransactionList({ initialTransactions }: { initialTransactions: 
         if (filterFrameRef.current?.contentWindow && source !== filterFrameRef.current.contentWindow) return;
 
         const status = record.status;
+        const paymentStatus = record.paymentStatus;
         const from = record.dateFrom;
         const to = record.dateTo;
 
         if (typeof status !== "string") return;
+        if (typeof paymentStatus !== "string") return;
         if (typeof from !== "string") return;
         if (typeof to !== "string") return;
 
@@ -98,10 +101,15 @@ export function TransactionList({ initialTransactions }: { initialTransactions: 
           status === "semua" || status === "diterima" || status === "siap" || status === "diambil"
             ? status
             : "semua";
+        const normalizedPaymentStatus =
+          paymentStatus === "semua" || paymentStatus === "paid" || paymentStatus === "unpaid"
+            ? paymentStatus
+            : "semua";
         const normalizedFrom = /^\d{4}-\d{2}-\d{2}$/.test(from) ? from : "";
         const normalizedTo = /^\d{4}-\d{2}-\d{2}$/.test(to) ? to : "";
 
         setFilterStatus(normalizedStatus);
+        setFilterPaymentStatus(normalizedPaymentStatus);
         setDateFrom(normalizedFrom);
         setDateTo(normalizedTo);
         setPage(1);
@@ -157,10 +165,15 @@ export function TransactionList({ initialTransactions }: { initialTransactions: 
       customerName.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus =
       filterStatus === "semua" || getLaundryStatus(t.status) === filterStatus;
+    const paid = isOrderPaid(t);
+    const matchesPayment =
+      filterPaymentStatus === "semua" ||
+      (filterPaymentStatus === "paid" && paid) ||
+      (filterPaymentStatus === "unpaid" && !paid);
     const receivedISO = new Date(t.received_at).toISOString().slice(0, 10);
     const matchesFrom = dateFrom ? receivedISO >= dateFrom : true;
     const matchesTo = dateTo ? receivedISO <= dateTo : true;
-    return matchesSearch && matchesStatus && matchesFrom && matchesTo;
+    return matchesSearch && matchesStatus && matchesPayment && matchesFrom && matchesTo;
   });
 
   const pageSize = 10;
@@ -346,7 +359,7 @@ export function TransactionList({ initialTransactions }: { initialTransactions: 
             }}
           >
             <iframe
-              src={`/embed/riwayat-filter?status=${encodeURIComponent(filterStatus)}&from=${encodeURIComponent(dateFrom)}&to=${encodeURIComponent(dateTo)}`}
+              src={`/embed/riwayat-filter?status=${encodeURIComponent(filterStatus)}&payment=${encodeURIComponent(filterPaymentStatus)}&from=${encodeURIComponent(dateFrom)}&to=${encodeURIComponent(dateTo)}`}
               className="w-full rounded-2xl bg-transparent"
               style={{ height: filterHeight ? `${filterHeight}px` : "360px" }}
               frameBorder={0}
