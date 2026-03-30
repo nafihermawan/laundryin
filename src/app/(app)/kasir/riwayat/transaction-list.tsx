@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useCallback, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { TransactionRow } from "@/lib/data/transactions";
 
 type Transaction = TransactionRow;
@@ -18,6 +19,7 @@ const paymentColors: Record<"paid" | "pending", string> = {
 };
 
 export function TransactionList({ initialTransactions }: { initialTransactions: Transaction[] }) {
+  const router = useRouter();
   const [isPending] = useTransition();
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("semua");
@@ -228,6 +230,16 @@ export function TransactionList({ initialTransactions }: { initialTransactions: 
             className="h-10 w-full rounded-xl border border-zinc-200 bg-white pl-10 pr-4 text-sm focus:border-sky-400 focus:outline-none focus:ring-4 focus:ring-sky-400/10"
           />
         </div>
+
+        <button
+          type="button"
+          onClick={() => {
+            router.refresh();
+          }}
+          className="inline-flex h-10 items-center justify-center rounded-xl border border-zinc-200 bg-white px-4 text-sm font-medium text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
+        >
+          Refresh
+        </button>
 
         <button
           type="button"

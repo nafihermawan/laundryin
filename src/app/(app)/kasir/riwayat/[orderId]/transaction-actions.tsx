@@ -26,6 +26,36 @@ function formatIDR(value: number) {
   }).format(value);
 }
 
+function formatCountdown(ms: number) {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const minutes = Math.floor(total / 60);
+  const seconds = total % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+function QrisCountdown({ expiresAt }: { expiresAt: string }) {
+  const [remainingMs, setRemainingMs] = useState<number | null>(null);
+
+  useEffect(() => {
+    const expiryMs = new Date(expiresAt).getTime();
+    if (!Number.isFinite(expiryMs)) return;
+
+    function tick() {
+      setRemainingMs(Math.max(0, expiryMs - Date.now()));
+    }
+
+    const timeout = window.setTimeout(tick, 0);
+    const interval = window.setInterval(tick, 1000);
+    return () => {
+      window.clearTimeout(timeout);
+      window.clearInterval(interval);
+    };
+  }, [expiresAt]);
+
+  if (remainingMs === null) return null;
+  return <div className="text-xs text-zinc-500">Sisa waktu: {formatCountdown(remainingMs)}</div>;
+}
+
 type Props = {
   orderId: string;
   orderNo: string;
@@ -467,12 +497,7 @@ export function TransactionActions({
                           <div className={`rounded-full px-3 py-1 text-xs font-semibold ${classes}`}>{label}</div>
                         );
                       })()}
-                      {qrisDynamic.expiresAt ? (
-                        <div className="text-xs text-zinc-500">
-                          Kedaluwarsa:{" "}
-                          {new Date(qrisDynamic.expiresAt).toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })}
-                        </div>
-                      ) : null}
+                      {qrisDynamic.expiresAt ? <QrisCountdown expiresAt={qrisDynamic.expiresAt} /> : null}
                       {(() => {
                         const expiredByTime =
                           !qrisPaid &&
