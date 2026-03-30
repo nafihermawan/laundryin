@@ -27,7 +27,6 @@ export function TransactionList({ initialTransactions }: { initialTransactions: 
   const [filterOpen, setFilterOpen] = useState(false);
   const [filterHeight, setFilterHeight] = useState<number | null>(null);
   const [detailOrder, setDetailOrder] = useState<Transaction | null>(null);
-  const [detailHeight, setDetailHeight] = useState<number | null>(null);
   const [viewportHeight, setViewportHeight] = useState(0);
 
   const detailFrameRef = useRef<HTMLIFrameElement | null>(null);
@@ -72,9 +71,6 @@ export function TransactionList({ initialTransactions }: { initialTransactions: 
           setFilterHeight(next);
           return;
         }
-        if (detailFrameRef.current?.contentWindow && source === detailFrameRef.current.contentWindow) {
-          setDetailHeight(next);
-        }
         return;
       }
 
@@ -108,22 +104,6 @@ export function TransactionList({ initialTransactions }: { initialTransactions: 
 
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, []);
-
-  const updateDetailHeightFromFrame = useCallback(() => {
-    const frame = detailFrameRef.current;
-    if (!frame) return;
-    try {
-      const doc = frame.contentDocument;
-      if (!doc) return;
-      const root =
-        (doc.getElementById("embed-root") as HTMLElement | null) ??
-        (doc.body.firstElementChild as HTMLElement | null) ??
-        doc.body;
-      const h = Math.ceil(root.getBoundingClientRect().height);
-      if (!Number.isFinite(h) || h <= 0) return;
-      setDetailHeight(Math.min(Math.max(Math.round(h), 300), 2000));
-    } catch {}
   }, []);
 
   const updateFilterHeightFromFrame = useCallback(() => {
@@ -382,13 +362,12 @@ export function TransactionList({ initialTransactions }: { initialTransactions: 
           onMouseDown={(e) => {
             if (e.target === e.currentTarget) {
               setDetailOrder(null);
-              setDetailHeight(null);
             }
           }}
         >
           {detailOrder.id ? (
             <div
-              className="w-full max-w-2xl overflow-auto rounded-2xl shadow-xl"
+              className="w-full max-w-2xl overflow-hidden rounded-2xl shadow-xl"
               style={{
                 maxHeight: maxModalHeight ? `${maxModalHeight}px` : "85vh",
                 WebkitOverflowScrolling: "touch",
@@ -396,17 +375,11 @@ export function TransactionList({ initialTransactions }: { initialTransactions: 
             >
               <iframe
                 src={`/embed/riwayat-detail/${detailOrder.id}`}
-                className="w-full rounded-2xl bg-transparent"
-                style={{ height: detailHeight ? `${detailHeight}px` : "720px" }}
+                className="h-full w-full rounded-2xl bg-transparent"
+                style={{ height: maxModalHeight ? `${maxModalHeight}px` : "85vh" }}
                 frameBorder={0}
-                scrolling="no"
+                scrolling="yes"
                 ref={detailFrameRef}
-                onLoad={() => {
-                  updateDetailHeightFromFrame();
-                  window.setTimeout(updateDetailHeightFromFrame, 50);
-                  window.setTimeout(updateDetailHeightFromFrame, 200);
-                  window.setTimeout(updateDetailHeightFromFrame, 500);
-                }}
               />
             </div>
           ) : (
