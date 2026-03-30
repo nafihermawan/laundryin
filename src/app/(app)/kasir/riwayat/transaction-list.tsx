@@ -385,7 +385,7 @@ export function TransactionList({ initialTransactions }: { initialTransactions: 
             }
           }}
         >
-          {detailOrder.id ? (
+          {detailOrder.id || detailOrder.order_no ? (
             <div
               className="w-full max-w-2xl overflow-hidden rounded-2xl shadow-xl"
               style={{
@@ -393,7 +393,7 @@ export function TransactionList({ initialTransactions }: { initialTransactions: 
               }}
             >
               <iframe
-                src={`/embed/riwayat-detail/${detailOrder.id}`}
+                src={`/embed/riwayat-detail/${encodeURIComponent(detailOrder.id || detailOrder.order_no)}`}
                 className="h-full w-full rounded-2xl bg-transparent"
                 frameBorder={0}
                 scrolling="yes"
