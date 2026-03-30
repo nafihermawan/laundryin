@@ -319,14 +319,15 @@ export function TransactionActions({
               >
                 Lanjutkan Pembayaran
               </button>
-            ) : null}
-            <button
-              type="button"
-              onClick={openPayModal}
-              className="inline-flex h-10 items-center justify-center rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white transition hover:bg-emerald-700"
-            >
-              Bayar
-            </button>
+            ) : (
+              <button
+                type="button"
+                onClick={openPayModal}
+                className="inline-flex h-10 items-center justify-center rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white transition hover:bg-emerald-700"
+              >
+                Bayar
+              </button>
+            )}
           </div>
         ) : null}
       </div>
