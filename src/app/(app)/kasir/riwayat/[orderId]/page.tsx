@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { createClient } from "@/lib/supabase/server";
 import { env } from "@/lib/env";
+import { CopyUrl } from "@/components/copy-url";
 
 import { TransactionActions } from "./transaction-actions";
 
@@ -90,6 +91,7 @@ export default async function TransactionDetailPage({
         status,
         received_at,
         due_at,
+        ready_at,
         completed_at,
         notes,
         customer:customers(name, phone),
@@ -257,6 +259,14 @@ export default async function TransactionDetailPage({
                   </div>
                 </div>
               ) : null}
+              {order.ready_at ? (
+                <div className="rounded-xl border border-zinc-100 bg-zinc-50 px-3 py-2 sm:col-span-2">
+                  <div className="text-xs font-medium text-zinc-500">Siap diambil pada</div>
+                  <div className="mt-1 text-sm font-medium text-sky-700">
+                    {formatDate(order.ready_at)}
+                  </div>
+                </div>
+              ) : null}
             </div>
 
             <div className="overflow-hidden rounded-2xl border border-zinc-200">
@@ -323,6 +333,14 @@ export default async function TransactionDetailPage({
           <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
             <div className="text-base font-semibold tracking-tight">Log Transaksi</div>
             <div className="mt-4 flex flex-col gap-3 text-sm">
+              {order.ready_at ? (
+                <div className="rounded-xl border border-zinc-100 bg-zinc-50 px-3 py-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="font-semibold text-zinc-900">Status: Siap Diambil</div>
+                    <span className="text-xs font-medium text-sky-700">{formatDate(order.ready_at)}</span>
+                  </div>
+                </div>
+              ) : null}
               {order.completed_at ? (
                 <div className="rounded-xl border border-zinc-100 bg-zinc-50 px-3 py-2">
                   <div className="flex items-center justify-between gap-3">
@@ -347,15 +365,9 @@ export default async function TransactionDetailPage({
                           : "bg-amber-100 text-amber-700 border-amber-200";
 
                     const timestamp = p.paid_at || p.created_at;
-                    const qrisImageUrl = typeof p.qris_image_url === "string" ? p.qris_image_url : null;
-                    const internalQrUrl = p.id ? `/api/qris/${encodeURIComponent(p.id)}/qr` : null;
                     const midtransQrCodeUrl =
                       typeof p.provider_ref === "string" && p.provider_ref
                         ? `${getMidtransApiBase()}/v2/qris/${p.provider_ref}/qr-code`
-                        : null;
-                    const proxyQrCodeUrl =
-                      typeof p.provider_ref === "string" && p.provider_ref
-                        ? `/v2/qris/${encodeURIComponent(p.provider_ref)}/qr-code`
                         : null;
 
                     return (
@@ -375,63 +387,14 @@ export default async function TransactionDetailPage({
                         {p.reference_no ? <div className="mt-1 text-xs text-zinc-600">Ref: {p.reference_no}</div> : null}
                         {p.notes ? <div className="mt-1 text-xs text-zinc-600">{p.notes}</div> : null}
                         {p.method === "qris_dynamic" && p.status === "pending" ? (
-                          <div className="mt-2 rounded-xl border border-zinc-200 bg-white p-3">
-                            <div className="text-[11px] font-semibold text-zinc-700">QRIS Tools</div>
-                            <div className="mt-2 grid gap-1.5 text-[11px] text-zinc-600">
-                              {midtransQrCodeUrl ? (
-                                <div className="grid grid-cols-[110px_1fr] items-start gap-2">
-                                  <div className="text-zinc-500">Midtrans QR URL</div>
-                                  <a
-                                    href={midtransQrCodeUrl}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="font-medium text-sky-700 hover:text-sky-800 break-all"
-                                  >
-                                    {midtransQrCodeUrl}
-                                  </a>
-                                </div>
-                              ) : null}
-                              {proxyQrCodeUrl ? (
-                                <div className="grid grid-cols-[110px_1fr] items-start gap-2">
-                                  <div className="text-zinc-500">Proxy QR URL</div>
-                                  <a
-                                    href={proxyQrCodeUrl}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="font-medium text-sky-700 hover:text-sky-800 break-all"
-                                  >
-                                    {proxyQrCodeUrl}
-                                  </a>
-                                </div>
-                              ) : null}
-                              {qrisImageUrl ? (
-                                <div className="grid grid-cols-[110px_1fr] items-start gap-2">
-                                  <div className="text-zinc-500">QR Image URL</div>
-                                  <a
-                                    href={qrisImageUrl}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="font-medium text-sky-700 hover:text-sky-800 break-all"
-                                  >
-                                    {qrisImageUrl}
-                                  </a>
-                                </div>
-                              ) : null}
-                              {internalQrUrl ? (
-                                <div className="grid grid-cols-[110px_1fr] items-start gap-2">
-                                  <div className="text-zinc-500">QR String PNG</div>
-                                  <a
-                                    href={internalQrUrl}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="font-medium text-sky-700 hover:text-sky-800 break-all"
-                                  >
-                                    {internalQrUrl}
-                                  </a>
-                                </div>
-                              ) : null}
+                          midtransQrCodeUrl ? (
+                            <div className="mt-2 rounded-xl border border-zinc-200 bg-white p-3">
+                              <div className="text-[11px] font-semibold text-zinc-700">Midtrans QR URL</div>
+                              <div className="mt-2">
+                                <CopyUrl value={midtransQrCodeUrl} />
+                              </div>
                             </div>
-                          </div>
+                          ) : null
                         ) : null}
                       </div>
                     );

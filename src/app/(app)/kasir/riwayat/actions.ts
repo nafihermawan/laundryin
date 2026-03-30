@@ -10,10 +10,23 @@ import type { Json } from "@/lib/supabase/database.types";
 
 export async function updateOrderStatus(orderId: string, newStatus: string): Promise<ActionResponse> {
   const supabase = await createClient();
-  
-  const updatePayload: { status: string; completed_at?: string } = { status: newStatus };
+
+  const now = new Date().toISOString();
+  const updatePayload: { status: string; completed_at?: string; ready_at?: string } = { status: newStatus };
+  if (newStatus === "siap") {
+    const { data: existing, error: existingError } = await supabase
+      .from("orders")
+      .select("ready_at")
+      .eq("id", orderId)
+      .maybeSingle();
+    if (existingError) return actionError(existingError.message);
+    const currentReadyAt = (existing as unknown as { ready_at?: string | null } | null)?.ready_at ?? null;
+    if (!currentReadyAt) {
+      updatePayload.ready_at = now;
+    }
+  }
   if (newStatus === "diambil") {
-    updatePayload.completed_at = new Date().toISOString();
+    updatePayload.completed_at = now;
   }
 
   const { error } = await supabase
@@ -161,6 +174,7 @@ export async function startQrisDynamicForOrder(orderId: string): Promise<ActionR
     .from("payments")
     .select("id")
     .eq("order_id", orderId)
+    .eq("method", "qris_dynamic")
     .eq("status", "pending")
     .order("created_at", { ascending: false })
     .limit(1)
@@ -170,27 +184,31 @@ export async function startQrisDynamicForOrder(orderId: string): Promise<ActionR
 
   const pendingPaymentId = (existingPending as unknown as { id?: string } | null)?.id ?? null;
 
-  let paymentId: string;
   if (pendingPaymentId) {
-    paymentId = pendingPaymentId;
-  } else {
-    const { data: inserted, error: insertError } = await supabase
+    const { error: expireError } = await supabase
       .from("payments")
-      .insert({
-        order_id: orderId,
-        cash_register_id: shiftId,
-        paid_at: null,
-        amount: total,
-        method: "qris_dynamic",
-        status: "pending",
-        received_by: user.id,
-      })
-      .select("id")
-      .single();
-
-    if (insertError) return actionError(insertError.message);
-    paymentId = inserted.id;
+      .update({ status: "expired", paid_at: null })
+      .eq("id", pendingPaymentId)
+      .eq("status", "pending");
+    if (expireError) return actionError(expireError.message);
   }
+
+  const { data: inserted, error: insertError } = await supabase
+    .from("payments")
+    .insert({
+      order_id: orderId,
+      cash_register_id: shiftId,
+      paid_at: null,
+      amount: total,
+      method: "qris_dynamic",
+      status: "pending",
+      received_by: user.id,
+    })
+    .select("id")
+    .single();
+
+  if (insertError) return actionError(insertError.message);
+  const paymentId = inserted.id;
 
   const notificationUrl = `${env.APP_BASE_URL.replace(/\/+$/, "")}/api/webhooks/midtrans`;
   const created = await createMidtransQrisCharge({
