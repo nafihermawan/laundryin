@@ -11,9 +11,14 @@ import type { Json } from "@/lib/supabase/database.types";
 export async function updateOrderStatus(orderId: string, newStatus: string): Promise<ActionResponse> {
   const supabase = await createClient();
   
+  const updatePayload: { status: string; completed_at?: string } = { status: newStatus };
+  if (newStatus === "diambil") {
+    updatePayload.completed_at = new Date().toISOString();
+  }
+
   const { error } = await supabase
     .from("orders")
-    .update({ status: newStatus })
+    .update(updatePayload)
     .eq("id", orderId);
 
   if (error) {

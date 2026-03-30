@@ -336,7 +336,8 @@ export function TransactionActions({
         <select
           value={status}
           onChange={(e) => handleStatusChange(e.target.value)}
-          className="h-10 rounded-xl border border-zinc-200 bg-white px-3 text-sm focus:border-sky-400 focus:outline-none focus:ring-4 focus:ring-sky-400/10"
+          disabled={!isPaid || status === "diambil"}
+          className="h-10 rounded-xl border border-zinc-200 bg-white px-3 text-sm focus:border-sky-400 focus:outline-none focus:ring-4 focus:ring-sky-400/10 disabled:cursor-not-allowed disabled:bg-zinc-50 disabled:text-zinc-500"
         >
           <option value="diterima" hidden>
             Diterima
@@ -344,6 +345,16 @@ export function TransactionActions({
           <option value="siap">Siap Diambil</option>
           <option value="diambil">Sudah Diambil</option>
         </select>
+        {!isPaid && (
+          <div className="text-[10px] text-amber-600 mt-1">
+            Status cucian hanya bisa diubah jika transaksi sudah lunas.
+          </div>
+        )}
+        {status === "diambil" && (
+          <div className="text-[10px] text-emerald-600 mt-1">
+            Transaksi sudah selesai/diambil.
+          </div>
+        )}
       </div>
 
       {payingOpen ? (

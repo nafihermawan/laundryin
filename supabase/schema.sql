@@ -78,6 +78,7 @@ create table if not exists public.orders (
   status text not null default 'received',
   received_at timestamptz not null default now(),
   due_at timestamptz,
+  completed_at timestamptz,
   notes text,
   created_by uuid references auth.users (id),
   created_at timestamptz not null default now(),

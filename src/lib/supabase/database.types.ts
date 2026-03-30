@@ -147,6 +147,7 @@ export interface Database {
           created_by: string | null;
           customer_id: string | null;
           due_at: string | null;
+          completed_at: string | null;
           id: string;
           notes: string | null;
           order_no: string;
@@ -159,6 +160,7 @@ export interface Database {
           created_by?: string | null;
           customer_id?: string | null;
           due_at?: string | null;
+          completed_at?: string | null;
           id?: string;
           notes?: string | null;
           order_no: string;
@@ -171,6 +173,7 @@ export interface Database {
           created_by?: string | null;
           customer_id?: string | null;
           due_at?: string | null;
+          completed_at?: string | null;
           id?: string;
           notes?: string | null;
           order_no?: string;
