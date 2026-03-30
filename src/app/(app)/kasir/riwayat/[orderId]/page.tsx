@@ -88,7 +88,7 @@ export default async function TransactionDetailPage({
         notes,
         customer:customers(name, phone),
         items:order_items(service_name, qty, unit, unit_price, subtotal),
-        payments:payments(amount, method, status, paid_at, reference_no, notes, created_at, qris_image_url, qris_expires_at, provider_ref, provider_status)
+        payments:payments(id, amount, method, status, paid_at, reference_no, notes, created_at, qris_image_url, qris_expires_at, provider_ref, provider_status)
       `,
     );
 
@@ -159,6 +159,7 @@ export default async function TransactionDetailPage({
   );
 
   const payments = (order.payments ?? []) as Array<{
+    id: string;
     amount: number;
     method: string;
     status: string;
@@ -342,6 +343,7 @@ export default async function TransactionDetailPage({
 
                     const timestamp = p.paid_at || p.created_at;
                     const qrisImageUrl = typeof p.qris_image_url === "string" ? p.qris_image_url : null;
+                    const internalQrUrl = p.id ? `/api/qris/${encodeURIComponent(p.id)}/qr` : null;
 
                     return (
                       <div key={idx} className="rounded-xl border border-zinc-100 bg-zinc-50 px-3 py-2">
@@ -359,18 +361,35 @@ export default async function TransactionDetailPage({
                         </div>
                         {p.reference_no ? <div className="mt-1 text-xs text-zinc-600">Ref: {p.reference_no}</div> : null}
                         {p.notes ? <div className="mt-1 text-xs text-zinc-600">{p.notes}</div> : null}
-                        {showQrisDebug && p.method === "qris_dynamic" && qrisImageUrl ? (
-                          <div className="mt-1 text-xs text-zinc-600 break-all">
-                            QR Image URL:{" "}
-                            <a
-                              href={qrisImageUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="font-medium text-sky-700 hover:text-sky-800"
-                            >
-                              {qrisImageUrl}
-                            </a>
-                          </div>
+                        {showQrisDebug && p.method === "qris_dynamic" && p.status === "pending" ? (
+                          <>
+                            {qrisImageUrl ? (
+                              <div className="mt-1 text-xs text-zinc-600 break-all">
+                                QR Image URL:{" "}
+                                <a
+                                  href={qrisImageUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="font-medium text-sky-700 hover:text-sky-800"
+                                >
+                                  {qrisImageUrl}
+                                </a>
+                              </div>
+                            ) : null}
+                            {internalQrUrl ? (
+                              <div className="mt-1 text-xs text-zinc-600 break-all">
+                                Simulator QR URL:{" "}
+                                <a
+                                  href={internalQrUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="font-medium text-sky-700 hover:text-sky-800"
+                                >
+                                  {internalQrUrl}
+                                </a>
+                              </div>
+                            ) : null}
+                          </>
                         ) : null}
                       </div>
                     );
