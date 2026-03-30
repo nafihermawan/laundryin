@@ -41,6 +41,7 @@ const paymentOptions = [
 ] as const;
 
 export function TransactionForm() {
+  type PaymentMethod = (typeof paymentOptions)[number]["value"];
   const [mounted, setMounted] = useState(false);
   const nextItemIdRef = useRef(1);
   const [dbServices, setDbServices] = useState<ServiceOption[]>([]);
@@ -82,9 +83,7 @@ export function TransactionForm() {
     d.setDate(d.getDate() + 2);
     return d.toISOString().slice(0, 16);
   });
-  const [paymentMethod, setPaymentMethod] = useState<
-    (typeof paymentOptions)[number]["value"]
-  >("cash");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | "">("");
   const [cashReceived, setCashReceived] = useState("");
 
   const [items, setItems] = useState<ItemRow[]>(() => [
@@ -103,6 +102,7 @@ export function TransactionForm() {
     if (!customerPhone.trim()) return false;
     if (items.length === 0) return false;
     if (!items.some((it) => it.serviceName.trim() && it.qty > 0)) return false;
+    if (!paymentMethod) return false;
     if (paymentMethod === "cash") {
       const received = toNumber(cashReceived);
       if (!Number.isFinite(received)) return false;
@@ -243,7 +243,7 @@ export function TransactionForm() {
     const localDue = new Date(d.getTime() - tzOffset);
     setDueAt(localDue.toISOString().slice(0, 16));
     
-    setPaymentMethod("cash");
+    setPaymentMethod("");
     nextItemIdRef.current = 1;
     setItems([{ id: "0", serviceName: "", unit: "kg", qty: 1, price: 0 }]);
   }
@@ -261,6 +261,11 @@ export function TransactionForm() {
     const validItems = items.filter((it) => it.serviceName.trim() && it.qty > 0);
     if (validItems.length === 0) {
       setSaveError("Minimal 1 item layanan wajib diisi");
+      return;
+    }
+
+    if (!paymentMethod) {
+      setSaveError("Pilih metode pembayaran");
       return;
     }
 
@@ -293,7 +298,7 @@ export function TransactionForm() {
         price: it.price,
       })),
       status: "diterima",
-      paymentMethod,
+      paymentMethod: paymentMethod as PaymentMethod,
       cashReceived:
         paymentMethod === "cash" && cashReceived.trim() !== ""
           ? toNumber(cashReceived)
@@ -730,14 +735,20 @@ export function TransactionForm() {
               <select
                 value={paymentMethod}
                 onChange={(e) => {
-                  const next = e.target.value as (typeof paymentOptions)[number]["value"];
-                  setPaymentMethod(next);
-                  if (next === "cash" && cashReceived.trim() === "") {
-                    setCashReceived(String(summary.total));
+                  const raw = e.target.value;
+                  if (!raw) {
+                    setPaymentMethod("");
+                    return;
                   }
+                  const next = raw as PaymentMethod;
+                  setPaymentMethod(next);
+                  if (next === "cash" && cashReceived.trim() === "") setCashReceived(String(summary.total));
                 }}
                 className="h-11 rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none focus:border-sky-400/70 focus:ring-4 focus:ring-sky-400/10"
               >
+                <option value="" disabled hidden>
+                  Pilih metode pembayaran
+                </option>
                 {paymentOptions.map((opt) => (
                   <option key={opt.value} value={opt.value}>
                     {opt.label}
