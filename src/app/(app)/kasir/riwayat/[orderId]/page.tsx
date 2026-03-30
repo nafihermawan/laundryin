@@ -82,28 +82,43 @@ export default async function TransactionDetailPage({
   } = await supabase.auth.getUser();
 
   const orderKey = resolvedParams.orderId;
-  const baseQuery = supabase
-    .from("orders")
-    .select(
-      `
-        id,
-        order_no,
-        status,
-        received_at,
-        due_at,
-        ready_at,
-        completed_at,
-        notes,
-        customer:customers(name, phone),
-        items:order_items(service_name, qty, unit, unit_price, subtotal),
-        payments:payments(id, amount, method, status, paid_at, reference_no, notes, created_at, qris_image_url, qris_expires_at, provider_ref, provider_status)
-      `,
-    );
+  const selectWithReadyAt = `
+    id,
+    order_no,
+    status,
+    received_at,
+    due_at,
+    ready_at,
+    completed_at,
+    notes,
+    customer:customers(name, phone),
+    items:order_items(service_name, qty, unit, unit_price, subtotal),
+    payments:payments(id, amount, method, status, paid_at, reference_no, notes, created_at, qris_image_url, qris_expires_at, provider_ref, provider_status)
+  `;
+  const selectWithoutReadyAt = `
+    id,
+    order_no,
+    status,
+    received_at,
+    due_at,
+    completed_at,
+    notes,
+    customer:customers(name, phone),
+    items:order_items(service_name, qty, unit, unit_price, subtotal),
+    payments:payments(id, amount, method, status, paid_at, reference_no, notes, created_at, qris_image_url, qris_expires_at, provider_ref, provider_status)
+  `;
 
-  const { data: order, error } = await (isUuid(orderKey)
-    ? baseQuery.eq("id", orderKey)
-    : baseQuery.eq("order_no", orderKey)
-  ).maybeSingle();
+  const withReadyQuery = isUuid(orderKey)
+    ? supabase.from("orders").select(selectWithReadyAt).eq("id", orderKey)
+    : supabase.from("orders").select(selectWithReadyAt).eq("order_no", orderKey);
+  let { data: order, error } = await withReadyQuery.maybeSingle();
+
+  if (error && typeof error.message === "string" && error.message.toLowerCase().includes("ready_at")) {
+    const withoutReadyQuery = isUuid(orderKey)
+      ? supabase.from("orders").select(selectWithoutReadyAt).eq("id", orderKey)
+      : supabase.from("orders").select(selectWithoutReadyAt).eq("order_no", orderKey);
+    ({ data: order, error } = await withoutReadyQuery.maybeSingle());
+  }
 
   if (error) {
     return (
@@ -332,7 +347,7 @@ export default async function TransactionDetailPage({
 
           <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
             <div className="text-base font-semibold tracking-tight">Log Transaksi</div>
-            <div className="mt-4 flex flex-col gap-3 text-sm">
+            <div className="mt-4 flex flex-col gap-3 text-xs">
               {order.ready_at ? (
                 <div className="rounded-xl border border-zinc-100 bg-zinc-50 px-3 py-2">
                   <div className="flex items-center justify-between gap-3">
@@ -351,7 +366,7 @@ export default async function TransactionDetailPage({
               ) : null}
 
               {payments.length === 0 ? (
-                <div className="text-sm text-zinc-500">Belum ada aktivitas pembayaran.</div>
+                <div className="text-xs text-zinc-500">Belum ada aktivitas pembayaran.</div>
               ) : (
                 payments
                   .slice()

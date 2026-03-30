@@ -6,6 +6,7 @@ import { HeightSender } from "../../height-sender";
 import { TransactionActions } from "@/app/(app)/kasir/riwayat/[orderId]/transaction-actions";
 import { PrintNotaButton } from "./print-nota-button";
 import { CloseEmbedButton } from "./close-embed-button";
+import { EmbedAutoRefresh, EmbedRefreshButton } from "./embed-refresh";
 
 function formatIDR(value: number) {
   return new Intl.NumberFormat("id-ID", {
@@ -170,13 +171,17 @@ export default async function RiwayatDetailEmbedPage({
         }}
       />
       <HeightSender />
+      <EmbedAutoRefresh />
       <div className="w-full rounded-2xl border border-zinc-200 bg-white shadow-xl">
         <div className="flex-none flex items-start justify-between gap-4 border-b border-zinc-100 bg-white p-5">
           <div className="flex flex-col gap-1">
             <div className="text-sm font-semibold text-zinc-900">Detail Transaksi</div>
             <div className="text-xs text-zinc-500">{order.order_no}</div>
           </div>
-          <PrintNotaButton orderId={order.id} />
+          <div className="flex items-center gap-2">
+            <EmbedRefreshButton />
+            <PrintNotaButton orderId={order.id} />
+          </div>
         </div>
 
         <div className="grid gap-4 p-5 lg:grid-cols-3">
@@ -298,7 +303,7 @@ export default async function RiwayatDetailEmbedPage({
 
             <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
               <div className="text-base font-semibold tracking-tight">Log Transaksi</div>
-              <div className="mt-4 flex flex-col gap-3 text-sm">
+              <div className="mt-4 flex flex-col gap-3 text-xs">
                 {order.ready_at ? (
                   <div className="rounded-xl border border-zinc-100 bg-zinc-50 px-3 py-2">
                     <div className="flex items-center justify-between gap-3">
@@ -316,7 +321,7 @@ export default async function RiwayatDetailEmbedPage({
                   </div>
                 ) : null}
                 {payments.length === 0 ? (
-                  <div className="text-sm text-zinc-500">Belum ada aktivitas pembayaran.</div>
+                  <div className="text-xs text-zinc-500">Belum ada aktivitas pembayaran.</div>
                 ) : (
                   payments
                     .slice()

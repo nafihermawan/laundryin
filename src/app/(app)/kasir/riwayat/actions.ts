@@ -14,6 +14,7 @@ export async function updateOrderStatus(orderId: string, newStatus: string): Pro
   const now = new Date().toISOString();
   const updatePayload: { status: string; completed_at?: string; ready_at?: string } = { status: newStatus };
   if (newStatus === "siap") {
+    let canUseReadyAt = true;
     const { data: existing, error: existingError } = await supabase
       .from("orders")
       .select("ready_at")
@@ -21,10 +22,14 @@ export async function updateOrderStatus(orderId: string, newStatus: string): Pro
       .maybeSingle();
     if (existingError) {
       const msg = typeof existingError.message === "string" ? existingError.message.toLowerCase() : "";
-      if (!msg.includes("ready_at")) return actionError(existingError.message);
+      if (msg.includes("ready_at")) {
+        canUseReadyAt = false;
+      } else {
+        return actionError(existingError.message);
+      }
     }
     const currentReadyAt = (existing as unknown as { ready_at?: string | null } | null)?.ready_at ?? null;
-    if (!currentReadyAt) {
+    if (canUseReadyAt && !currentReadyAt) {
       updatePayload.ready_at = now;
     }
   }
@@ -38,7 +43,15 @@ export async function updateOrderStatus(orderId: string, newStatus: string): Pro
     .eq("id", orderId);
 
   if (error) {
-    return actionError(error.message);
+    const msg = typeof error.message === "string" ? error.message.toLowerCase() : "";
+    if (msg.includes("ready_at")) {
+      const payload: { status: string; completed_at?: string } = { status: updatePayload.status };
+      if (updatePayload.completed_at) payload.completed_at = updatePayload.completed_at;
+      const { error: retryError } = await supabase.from("orders").update(payload).eq("id", orderId);
+      if (retryError) return actionError(retryError.message);
+    } else {
+      return actionError(error.message);
+    }
   }
 
   revalidatePath("/kasir/riwayat");
