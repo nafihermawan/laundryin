@@ -35,6 +35,26 @@ function parseDateParam(value: string | null) {
   return value;
 }
 
+function parseMethodParam(value: string | null) {
+  if (!value) return null;
+  if (value === "all") return "all";
+  if (value === "cash") return "cash";
+  if (value === "transfer") return "transfer";
+  if (value === "qris_manual") return "qris_manual";
+  if (value === "qris_dynamic") return "qris_dynamic";
+  return null;
+}
+
+function parseStatusParam(value: string | null) {
+  if (!value) return null;
+  if (value === "all") return "all";
+  if (value === "paid") return "paid";
+  if (value === "pending") return "pending";
+  if (value === "expired") return "expired";
+  if (value === "failed") return "failed";
+  return null;
+}
+
 function addDays(date: Date, days: number) {
   const d = new Date(date);
   d.setDate(d.getDate() + days);
@@ -63,73 +83,73 @@ export async function GET(req: Request) {
 
   const fromKey = parseDateParam(url.searchParams.get("from")) ?? defaultFromKey;
   const toKey = parseDateParam(url.searchParams.get("to")) ?? todayKey;
+  const methodFilter = parseMethodParam(url.searchParams.get("method")) ?? "all";
+  const statusFilter = parseStatusParam(url.searchParams.get("status")) ?? "paid";
 
   const fromStart = new Date(`${fromKey}T00:00:00+07:00`);
   const toEndExclusive = addDays(new Date(`${toKey}T00:00:00+07:00`), 1);
 
-  const { data: payments, error: payError } = await supabase
+  let query = supabase
     .from("payments")
-    .select("id, amount, paid_at, method, provider_ref, orders!inner(order_no)")
-    .eq("status", "paid")
-    .gte("paid_at", fromStart.toISOString())
-    .lt("paid_at", toEndExclusive.toISOString())
-    .order("paid_at", { ascending: true });
+    .select("id, amount, paid_at, created_at, method, status, provider_ref, orders!inner(order_no)");
+
+  if (statusFilter !== "all") {
+    query = query.eq("status", statusFilter);
+  }
+  if (methodFilter !== "all") {
+    query = query.eq("method", methodFilter);
+  }
+
+  if (statusFilter === "paid") {
+    query = query
+      .gte("paid_at", fromStart.toISOString())
+      .lt("paid_at", toEndExclusive.toISOString())
+      .order("paid_at", { ascending: true });
+  } else {
+    query = query
+      .gte("created_at", fromStart.toISOString())
+      .lt("created_at", toEndExclusive.toISOString())
+      .order("created_at", { ascending: true });
+  }
+
+  const { data: payments, error: payError } = await query;
 
   if (payError) {
     return new Response(payError.message || "Gagal memuat data laporan", { status: 500 });
   }
 
-  const daily = new Map<string, { dateKey: string; omzet: number; count: number }>();
-  for (const p of payments ?? []) {
-    if (!p.paid_at) continue;
-    const key = getJakartaDateKey(new Date(p.paid_at));
-    const current = daily.get(key) ?? { dateKey: key, omzet: 0, count: 0 };
-    current.omzet += Number(p.amount ?? 0);
-    current.count += 1;
-    daily.set(key, current);
-  }
-
-  const summaryRows: Array<{ dateKey: string; omzet: number; count: number }> = [];
-  for (
-    let d = new Date(`${fromKey}T00:00:00+07:00`);
-    getJakartaDateKey(d) <= toKey;
-    d = addDays(d, 1)
-  ) {
-    const key = getJakartaDateKey(d);
-    const v = daily.get(key);
-    summaryRows.push({ dateKey: key, omzet: v?.omzet ?? 0, count: v?.count ?? 0 });
-  }
-
-  const summaryAoa: Array<Array<string | number>> = [
-    ["Tanggal", "Omzet", "Transaksi"],
-    ...summaryRows.map((r) => [r.dateKey, r.omzet, r.count]),
-  ];
-
   const detailAoa: Array<Array<string | number>> = [
-    ["Waktu Bayar", "Order No", "Metode", "Nominal", "Provider Ref (Midtrans)", "Payment ID"],
+    ["Waktu", "Order No", "Metode", "Nominal", "Status", "Provider Ref (Midtrans)", "Payment ID"],
     ...(payments ?? []).map((p) => {
       const orderNo = (p.orders as unknown as { order_no?: string })?.order_no || "-";
-      const paidAt = typeof p.paid_at === "string" ? formatJakartaDateTime(p.paid_at) : "-";
+      const time =
+        (typeof p.paid_at === "string" && p.paid_at) || (typeof p.created_at === "string" && p.created_at);
+      const dateTime = time ? formatJakartaDateTime(time) : "-";
       const method = typeof p.method === "string" ? p.method : "-";
+      const status = typeof p.status === "string" ? p.status : "-";
       const providerRef = typeof p.provider_ref === "string" ? p.provider_ref : "";
       const amount = Number(p.amount ?? 0);
       const id = typeof p.id === "string" ? p.id : "";
-      return [paidAt, orderNo, method, amount, providerRef, id];
+      return [dateTime, orderNo, method, amount, status, providerRef, id];
     }),
   ];
 
   const wb = XLSX.utils.book_new();
 
-  const wsSummary = XLSX.utils.aoa_to_sheet(summaryAoa);
-  wsSummary["!cols"] = [{ wch: 12 }, { wch: 16 }, { wch: 10 }];
-  XLSX.utils.book_append_sheet(wb, wsSummary, "Ringkasan");
-
   const wsDetail = XLSX.utils.aoa_to_sheet(detailAoa);
-  wsDetail["!cols"] = [{ wch: 22 }, { wch: 16 }, { wch: 14 }, { wch: 14 }, { wch: 34 }, { wch: 38 }];
-  XLSX.utils.book_append_sheet(wb, wsDetail, "Detail");
+  wsDetail["!cols"] = [
+    { wch: 22 },
+    { wch: 16 },
+    { wch: 14 },
+    { wch: 14 },
+    { wch: 10 },
+    { wch: 34 },
+    { wch: 38 },
+  ];
+  XLSX.utils.book_append_sheet(wb, wsDetail, "Detail Transaksi");
 
   const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
-  const filename = `laporan-${fromKey}_to_${toKey}.xlsx`;
+  const filename = `laporan-detail-${fromKey}_to_${toKey}-${statusFilter}-${methodFilter}.xlsx`;
 
   return new Response(new Uint8Array(buf), {
     headers: {

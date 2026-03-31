@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 type SearchParams = {
   from?: string;
   to?: string;
+  method?: string;
+  status?: string;
 };
 
 function formatIDR(value: number) {
@@ -28,6 +30,26 @@ function parseDateParam(value: string | undefined) {
   return value;
 }
 
+function parseMethodParam(value: string | undefined) {
+  if (!value) return null;
+  if (value === "all") return "all";
+  if (value === "cash") return "cash";
+  if (value === "transfer") return "transfer";
+  if (value === "qris_manual") return "qris_manual";
+  if (value === "qris_dynamic") return "qris_dynamic";
+  return null;
+}
+
+function parseStatusParam(value: string | undefined) {
+  if (!value) return null;
+  if (value === "all") return "all";
+  if (value === "paid") return "paid";
+  if (value === "pending") return "pending";
+  if (value === "expired") return "expired";
+  if (value === "failed") return "failed";
+  return null;
+}
+
 function addDays(date: Date, days: number) {
   const d = new Date(date);
   d.setDate(d.getDate() + days);
@@ -46,17 +68,36 @@ export default async function AdminLaporanPage({
 
   const fromKey = parseDateParam(searchParams.from) ?? defaultFromKey;
   const toKey = parseDateParam(searchParams.to) ?? todayKey;
+  const methodFilter = parseMethodParam(searchParams.method) ?? "all";
+  const statusFilter = parseStatusParam(searchParams.status) ?? "paid";
 
   const fromStart = new Date(`${fromKey}T00:00:00+07:00`);
   const toEndExclusive = addDays(new Date(`${toKey}T00:00:00+07:00`), 1);
 
-  const { data: payments, error } = await supabase
+  let query = supabase
     .from("payments")
-    .select("amount, paid_at, method, provider_ref, orders!inner(order_no)")
-    .eq("status", "paid")
-    .gte("paid_at", fromStart.toISOString())
-    .lt("paid_at", toEndExclusive.toISOString())
-    .order("paid_at", { ascending: true });
+    .select("amount, paid_at, created_at, method, status, provider_ref, orders!inner(order_no)");
+
+  if (statusFilter !== "all") {
+    query = query.eq("status", statusFilter);
+  }
+  if (methodFilter !== "all") {
+    query = query.eq("method", methodFilter);
+  }
+
+  if (statusFilter === "paid") {
+    query = query
+      .gte("paid_at", fromStart.toISOString())
+      .lt("paid_at", toEndExclusive.toISOString())
+      .order("paid_at", { ascending: true });
+  } else {
+    query = query
+      .gte("created_at", fromStart.toISOString())
+      .lt("created_at", toEndExclusive.toISOString())
+      .order("created_at", { ascending: true });
+  }
+
+  const { data: payments, error } = await query;
 
   if (error) {
     return (
@@ -70,8 +111,9 @@ export default async function AdminLaporanPage({
   const daily = new Map<string, { dateKey: string; omzet: number; count: number }>();
 
   for (const p of payments ?? []) {
-    if (!p.paid_at) continue;
-    const key = getJakartaDateKey(new Date(p.paid_at));
+    const time = (typeof p.paid_at === "string" && p.paid_at) || (typeof p.created_at === "string" && p.created_at);
+    if (!time) continue;
+    const key = getJakartaDateKey(new Date(time));
     const current = daily.get(key) ?? { dateKey: key, omzet: 0, count: 0 };
     current.omzet += Number(p.amount ?? 0);
     current.count += 1;
@@ -93,7 +135,7 @@ export default async function AdminLaporanPage({
   const totalCount = rows.reduce((sum, r) => sum + r.count, 0);
   const dayCount = Math.max(1, rows.length);
   const avgOmzet = Math.round(totalOmzet / dayCount);
-  const downloadHref = `/api/admin/laporan/excel?from=${encodeURIComponent(fromKey)}&to=${encodeURIComponent(toKey)}`;
+  const downloadHref = `/api/admin/laporan/excel?from=${encodeURIComponent(fromKey)}&to=${encodeURIComponent(toKey)}&method=${encodeURIComponent(methodFilter)}&status=${encodeURIComponent(statusFilter)}`;
   return (
     <div className="relative pb-24 lg:pb-0">
       <div className="flex flex-col gap-6">
@@ -111,7 +153,7 @@ export default async function AdminLaporanPage({
       </div>
 
       <form className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
-        <div className="grid gap-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_auto] lg:items-end">
           <label className="flex flex-col gap-2">
             <span className="text-sm font-medium text-zinc-700">Dari</span>
             <input
@@ -129,6 +171,34 @@ export default async function AdminLaporanPage({
               defaultValue={toKey}
               className="h-11 rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none focus:border-sky-400/70 focus:ring-4 focus:ring-sky-400/10"
             />
+          </label>
+          <label className="flex flex-col gap-2">
+            <span className="text-sm font-medium text-zinc-700">Metode</span>
+            <select
+              name="method"
+              defaultValue={methodFilter}
+              className="h-11 rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none focus:border-sky-400/70 focus:ring-4 focus:ring-sky-400/10"
+            >
+              <option value="all">Semua</option>
+              <option value="cash">Cash</option>
+              <option value="transfer">Transfer</option>
+              <option value="qris_manual">QRIS Manual</option>
+              <option value="qris_dynamic">QRIS Dinamis</option>
+            </select>
+          </label>
+          <label className="flex flex-col gap-2">
+            <span className="text-sm font-medium text-zinc-700">Status</span>
+            <select
+              name="status"
+              defaultValue={statusFilter}
+              className="h-11 rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none focus:border-sky-400/70 focus:ring-4 focus:ring-sky-400/10"
+            >
+              <option value="paid">Paid</option>
+              <option value="pending">Pending</option>
+              <option value="expired">Expired</option>
+              <option value="failed">Failed</option>
+              <option value="all">Semua</option>
+            </select>
           </label>
           <button
             type="submit"
@@ -153,7 +223,7 @@ export default async function AdminLaporanPage({
           </div>
         </div>
         <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
-          <div className="text-xs font-medium text-zinc-500">Transaksi Lunas</div>
+          <div className="text-xs font-medium text-zinc-500">Transaksi</div>
           <div className="mt-1 text-xl font-semibold tracking-tight text-zinc-900">
             {totalCount}
           </div>
@@ -197,34 +267,37 @@ export default async function AdminLaporanPage({
 
       <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
         <div className="border-b border-zinc-100 bg-white px-4 py-3">
-          <h2 className="text-base font-semibold tracking-tight text-zinc-900">Detail Transaksi Lunas</h2>
+          <h2 className="text-base font-semibold tracking-tight text-zinc-900">Detail Transaksi</h2>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b border-zinc-100 bg-zinc-50 text-xs font-medium text-zinc-500">
-                <th className="px-4 py-3">Waktu Bayar</th>
+                <th className="px-4 py-3">Waktu</th>
                 <th className="px-4 py-3">Order No</th>
                 <th className="px-4 py-3">Metode</th>
                 <th className="px-4 py-3">Nominal</th>
+                <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Provider Ref (Midtrans)</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-100">
               {!payments || payments.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-10 text-center text-zinc-500">
-                    Tidak ada transaksi lunas.
+                  <td colSpan={6} className="px-4 py-10 text-center text-zinc-500">
+                    Tidak ada data.
                   </td>
                 </tr>
               ) : (
                 payments.map((p, idx) => {
                   const orderNo = (p.orders as unknown as { order_no?: string })?.order_no || "-";
                   const methodLabel = p.method === "qris_dynamic" ? "QRIS Dinamis" : p.method;
+                  const time = (typeof p.paid_at === "string" && p.paid_at) || (typeof p.created_at === "string" && p.created_at);
+                  const statusLabel = typeof p.status === "string" ? p.status : "-";
                   return (
                     <tr key={idx} className="hover:bg-zinc-50/50">
                       <td className="px-4 py-3 text-zinc-700">
-                        {p.paid_at ? new Date(p.paid_at).toLocaleString("id-ID") : "-"}
+                        {time ? new Date(time).toLocaleString("id-ID") : "-"}
                       </td>
                       <td className="px-4 py-3 font-medium text-zinc-900">
                         {orderNo}
@@ -236,6 +309,9 @@ export default async function AdminLaporanPage({
                       </td>
                       <td className="px-4 py-3 font-medium text-zinc-900">
                         {formatIDR(Number(p.amount ?? 0))}
+                      </td>
+                      <td className="px-4 py-3 text-zinc-700">
+                        {statusLabel}
                       </td>
                       <td className="px-4 py-3 text-xs text-zinc-500 font-mono">
                         {p.provider_ref || "-"}
