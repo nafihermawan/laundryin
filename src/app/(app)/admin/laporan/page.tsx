@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { LaporanControls } from "./laporan-controls";
 
 type SearchParams = {
   from?: string;
@@ -135,7 +136,6 @@ export default async function AdminLaporanPage({
   const totalCount = rows.reduce((sum, r) => sum + r.count, 0);
   const dayCount = Math.max(1, rows.length);
   const avgOmzet = Math.round(totalOmzet / dayCount);
-  const downloadHref = `/api/admin/laporan/excel?from=${encodeURIComponent(fromKey)}&to=${encodeURIComponent(toKey)}&method=${encodeURIComponent(methodFilter)}&status=${encodeURIComponent(statusFilter)}`;
   return (
     <div className="relative pb-24 lg:pb-0">
       <div className="flex flex-col gap-6">
@@ -144,70 +144,8 @@ export default async function AdminLaporanPage({
           <h1 className="text-2xl font-semibold tracking-tight">Laporan</h1>
           <p className="text-sm text-zinc-600">Ringkasan omzet per hari.</p>
         </div>
-        <a
-          href={downloadHref}
-          className="inline-flex h-10 items-center justify-center rounded-xl border border-zinc-200 bg-white px-3 text-sm font-semibold text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
-        >
-          Download Excel
-        </a>
+        <LaporanControls fromKey={fromKey} toKey={toKey} method={methodFilter} status={statusFilter} />
       </div>
-
-      <form className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_auto] lg:items-end">
-          <label className="flex flex-col gap-2">
-            <span className="text-sm font-medium text-zinc-700">Dari</span>
-            <input
-              type="date"
-              name="from"
-              defaultValue={fromKey}
-              className="h-11 rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none focus:border-sky-400/70 focus:ring-4 focus:ring-sky-400/10"
-            />
-          </label>
-          <label className="flex flex-col gap-2">
-            <span className="text-sm font-medium text-zinc-700">Sampai</span>
-            <input
-              type="date"
-              name="to"
-              defaultValue={toKey}
-              className="h-11 rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none focus:border-sky-400/70 focus:ring-4 focus:ring-sky-400/10"
-            />
-          </label>
-          <label className="flex flex-col gap-2">
-            <span className="text-sm font-medium text-zinc-700">Metode</span>
-            <select
-              name="method"
-              defaultValue={methodFilter}
-              className="h-11 rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none focus:border-sky-400/70 focus:ring-4 focus:ring-sky-400/10"
-            >
-              <option value="all">Semua</option>
-              <option value="cash">Cash</option>
-              <option value="transfer">Transfer</option>
-              <option value="qris_manual">QRIS Manual</option>
-              <option value="qris_dynamic">QRIS Dinamis</option>
-            </select>
-          </label>
-          <label className="flex flex-col gap-2">
-            <span className="text-sm font-medium text-zinc-700">Status</span>
-            <select
-              name="status"
-              defaultValue={statusFilter}
-              className="h-11 rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none focus:border-sky-400/70 focus:ring-4 focus:ring-sky-400/10"
-            >
-              <option value="paid">Paid</option>
-              <option value="pending">Pending</option>
-              <option value="expired">Expired</option>
-              <option value="failed">Failed</option>
-              <option value="all">Semua</option>
-            </select>
-          </label>
-          <button
-            type="submit"
-            className="inline-flex h-11 items-center justify-center rounded-xl bg-zinc-900 px-4 text-sm font-semibold text-white transition hover:bg-zinc-800"
-          >
-            Terapkan
-          </button>
-        </div>
-      </form>
 
       <div className="grid gap-3 sm:grid-cols-3">
         <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
