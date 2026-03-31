@@ -14,10 +14,13 @@ export async function getAllTransactions(): Promise<TransactionRow[]> {
   const { data, error } = await supabase
     .from("orders")
     .select(`
-      *,
+      id,
+      order_no,
+      status,
+      received_at,
+      created_by,
       customer:customers(name, phone),
-      payments(amount, method, status),
-      order_items(*)
+      payments(status)
     `)
     .order("created_at", { ascending: false });
 

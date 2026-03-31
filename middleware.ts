@@ -34,13 +34,11 @@ export async function middleware(request: NextRequest) {
     },
   });
 
-  await supabase.auth.getUser();
+  await supabase.auth.getSession();
 
   return response;
 }
 
 export const config = {
-  matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|login$|logout$|auth/sign-in$|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
-  ],
+  matcher: ["/(kasir|admin|embed|api|v2)/:path*"],
 };
