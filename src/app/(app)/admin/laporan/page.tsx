@@ -93,12 +93,21 @@ export default async function AdminLaporanPage({
   const totalCount = rows.reduce((sum, r) => sum + r.count, 0);
   const dayCount = Math.max(1, rows.length);
   const avgOmzet = Math.round(totalOmzet / dayCount);
+  const downloadHref = `/api/admin/laporan/excel?from=${encodeURIComponent(fromKey)}&to=${encodeURIComponent(toKey)}`;
   return (
     <div className="relative pb-24 lg:pb-0">
       <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Laporan</h1>
-        <p className="text-sm text-zinc-600">Ringkasan omzet per hari.</p>
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-2xl font-semibold tracking-tight">Laporan</h1>
+          <p className="text-sm text-zinc-600">Ringkasan omzet per hari.</p>
+        </div>
+        <a
+          href={downloadHref}
+          className="inline-flex h-10 items-center justify-center rounded-xl border border-zinc-200 bg-white px-3 text-sm font-semibold text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
+        >
+          Download Excel
+        </a>
       </div>
 
       <form className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
