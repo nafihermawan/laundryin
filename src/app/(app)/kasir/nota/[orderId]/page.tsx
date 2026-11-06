@@ -83,6 +83,31 @@ export default async function NotaPage({
     | { name?: string; phone?: string | null }
     | null;
 
+  const receipt = {
+    orderNo: order.order_no,
+    receivedAt: order.received_at,
+    dueAt: order.due_at ?? null,
+    customerName: customer?.name ?? null,
+    customerPhone: customer?.phone ?? null,
+    items: items.map((it) => ({
+      name: it.service_name,
+      qty: Number(it.qty ?? 0),
+      unit: it.unit,
+      unitPrice: Number(it.unit_price ?? 0),
+      subtotal: Number(it.subtotal ?? (it.qty ?? 0) * (it.unit_price ?? 0)),
+    })),
+    total,
+    paid: paidPayment
+      ? {
+          method: paidPayment.method,
+          amount: Number(paidPayment.amount ?? 0),
+          paidAt: paidPayment.paid_at ?? null,
+          referenceNo: paidPayment.reference_no ?? null,
+        }
+      : null,
+    notes: order.notes ?? null,
+  };
+
   return (
     <div className="flex min-h-full flex-1 flex-col">
       <div className="print:hidden">
@@ -181,7 +206,7 @@ export default async function NotaPage({
       </div>
       </div>
       </main>
-      <PrintBar />
+      <PrintBar receipt={receipt} />
     </div>
   );
 }
