@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
 import { ActionResponse, success, error as actionError } from "@/lib/action-response";
 import { env } from "@/lib/env";
@@ -187,6 +188,10 @@ export async function startQrisDynamicForOrder(orderId: string): Promise<ActionR
 
   if (!env.APP_BASE_URL) return actionError("APP_BASE_URL belum diset");
 
+  // Internal payment writes (attach QRIS details, cancel/replace attempts) run with
+  // the service role. Clients no longer have any update path to payments.
+  const admin = createAdminClient();
+
   let shiftId: string | null = null;
   if (role !== "admin") {
     const { data: shift } = await supabase
@@ -266,7 +271,7 @@ export async function startQrisDynamicForOrder(orderId: string): Promise<ActionR
         await cancelMidtransTransaction(latest.midtrans_order_id);
       } catch {}
     }
-    await supabase
+    await admin
       .from("payments")
       .update({ status: "failed", provider_status: "cancel", paid_at: null, notes: "replaced_by_new_qr" })
       .eq("id", latest.id)
@@ -283,7 +288,7 @@ export async function startQrisDynamicForOrder(orderId: string): Promise<ActionR
   const attemptNo = (count ?? 0) + 1;
   const midtransOrderId = `${order.order_no}-${attemptNo}`;
 
-  const { data: inserted, error: insertError } = await supabase
+  const { data: inserted, error: insertError } = await admin
     .from("payments")
     .insert({
       order_id: orderId,
@@ -312,7 +317,7 @@ export async function startQrisDynamicForOrder(orderId: string): Promise<ActionR
       expiryMinutes: 15,
     });
   } catch (err) {
-    await supabase
+    await admin
       .from("payments")
       .update({ status: "failed", paid_at: null, notes: "charge_failed" })
       .eq("id", paymentId);
@@ -321,7 +326,7 @@ export async function startQrisDynamicForOrder(orderId: string): Promise<ActionR
 
   const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
 
-  const { error: updateError } = await supabase
+  const { error: updateError } = await admin
     .from("payments")
     .update({
       cash_register_id: shiftId,
@@ -413,7 +418,10 @@ export async function checkQrisDynamicPaymentStatus(
     updatePayload.paid_at = null;
   }
 
-  const { error: updateError } = await supabase.from("payments").update(updatePayload).eq("id", paymentId);
+  // Midtrans verified the settlement above; write with the service role because
+  // clients have no update path to payments anymore.
+  const admin = createAdminClient();
+  const { error: updateError } = await admin.from("payments").update(updatePayload).eq("id", paymentId);
   if (updateError) return actionError(updateError.message || "Gagal memperbarui status pembayaran");
 
   try {

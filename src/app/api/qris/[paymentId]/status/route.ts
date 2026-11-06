@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getMidtransTransactionStatus } from "@/lib/payments/midtrans";
 import type { Json } from "@/lib/supabase/database.types";
 
@@ -84,7 +85,10 @@ export async function POST(
     updatePayload.paid_at = null;
   }
 
-  const { error: updateError } = await supabase.from("payments").update(updatePayload).eq("id", paymentId);
+  // Midtrans verified the status above; write with the service role because
+  // clients have no update path to payments anymore.
+  const admin = createAdminClient();
+  const { error: updateError } = await admin.from("payments").update(updatePayload).eq("id", paymentId);
   if (updateError) {
     const body: ApiResponse = { success: false, error: updateError.message || "Gagal memperbarui status pembayaran" };
     return Response.json(body, { status: 500 });

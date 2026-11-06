@@ -4,8 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { success as actionSuccess, error as actionError, type ActionResponse } from "@/lib/action-response";
 import { getUserRole } from "@/lib/auth/get-user-role";
-import { env } from "@/lib/env";
-import { createMidtransQrisCharge, getMidtransTransactionStatus } from "@/lib/payments/midtrans";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { getMidtransTransactionStatus } from "@/lib/payments/midtrans";
 import type { Json } from "@/lib/supabase/database.types";
 
 export type TransactionData = {
@@ -205,92 +205,45 @@ export async function saveTransaction(
       return actionSuccess({ orderNo, orderId: createdOrderId });
     }
 
-    // 6. Insert Payment
-    const isCashPaidNow = data.paymentMethod === "cash" && !data.payLater;
-    const cashReceived =
-      isCashPaidNow && typeof data.cashReceived === "number" ? data.cashReceived : null;
-    const change = cashReceived !== null ? cashReceived - computedTotal : null;
-    const paymentNotes =
-      isCashPaidNow && (cashReceived !== null || change !== null)
-        ? [cashReceived !== null ? `cash_received=${cashReceived}` : null, change !== null ? `change=${change}` : null]
-            .filter(Boolean)
-            .join(" | ")
-        : null;
-
-    const { data: createdPayment, error: payError } = await supabase
-      .from("payments")
-      .insert({
-        order_id: createdOrderId,
-        cash_register_id: shiftId,
-        paid_at: isCashPaidNow ? new Date().toISOString() : null,
-        amount: computedTotal,
-        method: data.paymentMethod,
-        status: isCashPaidNow ? "paid" : "pending",
-        received_by: user.id,
-        notes: paymentNotes,
-      })
-      .select("id")
-      .single();
-
-    if (payError) {
+    // 6. Payment. Clients never write "paid" directly: cash goes through the
+    //    security-definer pay_order(); QRIS is handled from the payment page.
+    if (data.paymentMethod === "qris_dynamic") {
       await supabase.from("orders").delete().eq("id", createdOrderId);
-      return actionError(payError.message || "Gagal menyimpan pembayaran");
+      return actionError("Pembayaran QRIS dilakukan dari halaman Pembayaran");
     }
 
-    if (data.paymentMethod === "qris_dynamic") {
-      if (!env.APP_BASE_URL) {
-        await supabase.from("orders").delete().eq("id", createdOrderId);
-        return actionError("APP_BASE_URL belum diset");
-      }
-
-      const notificationUrl = `${env.APP_BASE_URL.replace(/\/+$/, "")}/api/webhooks/midtrans`;
-      const created = await createMidtransQrisCharge({
-        orderId: createdPayment.id,
-        grossAmount: computedTotal,
-        notificationUrl,
+    if (data.payLater) {
+      const { error: payError } = await supabase.from("payments").insert({
+        order_id: createdOrderId,
+        cash_register_id: shiftId,
+        paid_at: null,
+        amount: computedTotal,
+        method: "cash",
+        status: "pending",
+        received_by: user.id,
       });
-
-      const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
-
-      const { error: qrisUpdateError } = await supabase
-        .from("payments")
-        .update({
-          provider: created.provider,
-          provider_ref: created.providerRef,
-          provider_status: created.providerStatus,
-          provider_payload: created.raw as Json,
-          qris_qr_string: created.qrString,
-          qris_image_url: created.qrImageUrl,
-          qris_expires_at: expiresAt,
-        })
-        .eq("id", createdPayment.id);
-
-      if (qrisUpdateError) {
+      if (payError) {
         await supabase.from("orders").delete().eq("id", createdOrderId);
-        return actionError(qrisUpdateError.message || "Gagal membuat QRIS dinamis");
+        return actionError(payError.message || "Gagal menyimpan pembayaran");
       }
-
-      try {
-        revalidatePath("/kasir/riwayat");
-      } catch {}
-
-      return actionSuccess({
-        orderNo,
-        orderId: createdOrderId,
-        qris: {
-          paymentId: createdPayment.id,
-          providerRef: created.providerRef,
-          qrString: created.qrString,
-          imageUrl: created.qrImageUrl,
-          expiresAt,
-        },
+    } else {
+      const { error: payError } = await supabase.rpc("pay_order", {
+        order_id: createdOrderId,
+        method: "cash",
+        cash_received: typeof data.cashReceived === "number" ? data.cashReceived : 0,
+        reference_no: "",
+        notes: "",
       });
+      if (payError) {
+        await supabase.from("orders").delete().eq("id", createdOrderId);
+        return actionError(payError.message || "Gagal menyimpan pembayaran");
+      }
     }
 
     try {
       revalidatePath("/kasir/riwayat");
     } catch {}
-    
+
     return actionSuccess({ orderNo, orderId: createdOrderId });
   } catch (err) {
     console.error("Save transaction error:", err);
@@ -359,7 +312,10 @@ export async function checkQrisDynamicPaymentStatus(
     updatePayload.paid_at = null;
   }
 
-  const { error: updateError } = await supabase.from("payments").update(updatePayload).eq("id", paymentId);
+  // Midtrans verified the settlement above; write with the service role because
+  // clients have no update path to payments anymore.
+  const admin = createAdminClient();
+  const { error: updateError } = await admin.from("payments").update(updatePayload).eq("id", paymentId);
   if (updateError) return actionError(updateError.message || "Gagal memperbarui status pembayaran");
 
   try {
