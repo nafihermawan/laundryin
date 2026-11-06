@@ -201,6 +201,7 @@ export interface Database {
           created_at: string;
           id: string;
           method: string;
+          midtrans_order_id: string | null;
           notes: string | null;
           order_id: string;
           paid_at: string | null;
@@ -221,6 +222,7 @@ export interface Database {
           created_at?: string;
           id?: string;
           method?: string;
+          midtrans_order_id?: string | null;
           notes?: string | null;
           order_id: string;
           paid_at?: string | null;
@@ -241,6 +243,7 @@ export interface Database {
           created_at?: string;
           id?: string;
           method?: string;
+          midtrans_order_id?: string | null;
           notes?: string | null;
           order_id?: string;
           paid_at?: string | null;

@@ -1,23 +1,13 @@
 import { redirect } from "next/navigation";
-import Image from "next/image";
+import { WashingMachine } from "lucide-react";
 
+import { APP_VERSION } from "@/lib/app-version";
 import { getUserRole } from "@/lib/auth/get-user-role";
 import { createClient } from "@/lib/supabase/server";
 
-export default async function LoginPage({
-  searchParams,
-}: {
-  searchParams?: Promise<{ error?: string }>;
-}) {
-  const sp = await searchParams;
-  const errorCode = sp?.error;
-  const errorMessage =
-    errorCode === "inactive"
-      ? "Akun ini dinonaktifkan. Hubungi admin."
-      : errorCode === "1"
-        ? "Email atau password salah."
-        : null;
+import { LoginForm } from "./login-form";
 
+export default async function LoginPage() {
   const supabase = await createClient();
   const {
     data: { user },
@@ -29,57 +19,40 @@ export default async function LoginPage({
   }
 
   return (
-    <div className="flex flex-col gap-6 text-white">
-      <div className="flex flex-col gap-2">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-white">
-            <Image src="/icon.svg" alt="laundry.in" width={40} height={40} priority />
+    <div
+      className="flex min-h-[100dvh] flex-col bg-[#F8FAFC]"
+      style={{ paddingTop: "calc(88px + env(safe-area-inset-top))" }}
+    >
+      <div className="mx-auto flex w-full max-w-[400px] flex-1 flex-col gap-8 px-6">
+        <div className="flex flex-col gap-5">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-600">
+              <WashingMachine className="h-6 w-6 text-white" strokeWidth={2} />
+            </span>
+            <span className="font-display text-[20px] font-bold tracking-tight text-slate-900">
+              laundry.in
+            </span>
           </div>
-          <div className="flex flex-col leading-tight">
-            <span className="text-sm text-white/70">laundry.in</span>
-            <h1 className="text-xl font-semibold tracking-tight">Masuk</h1>
+
+          <div className="flex flex-col gap-1.5">
+            <h1 className="font-display text-[26px] font-bold tracking-[-0.02em] text-slate-900">
+              Masuk ke akun
+            </h1>
+            <p className="text-[15px] leading-relaxed text-slate-500">
+              Gunakan akun kasir atau admin yang diberikan pemilik laundry.
+            </p>
           </div>
         </div>
+
+        <LoginForm />
       </div>
 
-      {errorMessage ? (
-        <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-50">
-          {errorMessage}
-        </div>
-      ) : null}
-
-      <form action="/auth/sign-in" method="post" className="flex flex-col gap-4">
-        <label className="flex flex-col gap-2">
-          <span className="text-sm font-medium text-white/80">Email</span>
-          <input
-            name="email"
-            type="email"
-            autoComplete="email"
-            required
-            placeholder="contoh: kasir@laundry.local"
-            className="h-11 rounded-xl border border-white/10 bg-white/5 px-4 text-sm text-white outline-none placeholder:text-white/35 focus:border-sky-400/60 focus:ring-4 focus:ring-sky-400/10"
-          />
-        </label>
-
-        <label className="flex flex-col gap-2">
-          <span className="text-sm font-medium text-white/80">Password</span>
-          <input
-            name="password"
-            type="password"
-            autoComplete="current-password"
-            required
-            placeholder="••••••••"
-            className="h-11 rounded-xl border border-white/10 bg-white/5 px-4 text-sm text-white outline-none placeholder:text-white/35 focus:border-sky-400/60 focus:ring-4 focus:ring-sky-400/10"
-          />
-        </label>
-
-        <button
-          type="submit"
-          className="mt-1 inline-flex h-11 items-center justify-center rounded-xl bg-sky-400 px-4 text-sm font-semibold text-zinc-950 shadow-sm shadow-sky-400/20 transition hover:bg-sky-300"
-        >
-          Masuk
-        </button>
-      </form>
+      <footer
+        className="mx-auto w-full max-w-[400px] px-6 text-center text-xs text-slate-500"
+        style={{ paddingBottom: "calc(32px + env(safe-area-inset-bottom))" }}
+      >
+        laundry.in v{APP_VERSION}
+      </footer>
     </div>
   );
 }

@@ -41,7 +41,7 @@ export default function Loading() {
           ))}
         </div>
       </main>
-      <BottomNav />
+      <BottomNav role="admin" />
     </div>
   );
 }

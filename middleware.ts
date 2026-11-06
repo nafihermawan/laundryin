@@ -40,5 +40,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/(kasir|admin|embed|api|v2)/:path*"],
+  matcher: ["/(kasir|admin|embed|api|v2|transaksi)/:path*"],
 };

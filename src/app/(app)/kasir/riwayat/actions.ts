@@ -1,17 +1,41 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
 import { ActionResponse, success, error as actionError } from "@/lib/action-response";
 import { env } from "@/lib/env";
 import { getUserRole } from "@/lib/auth/get-user-role";
-import { createMidtransQrisCharge, getMidtransTransactionStatus } from "@/lib/payments/midtrans";
+import {
+  cancelMidtransTransaction,
+  createMidtransQrisCharge,
+  getMidtransTransactionStatus,
+} from "@/lib/payments/midtrans";
 import type { Json } from "@/lib/supabase/database.types";
 
 export async function updateOrderStatus(orderId: string, newStatus: string): Promise<ActionResponse> {
   const supabase = await createClient();
 
   const now = new Date().toISOString();
+
+  if (newStatus === "siap" || newStatus === "diambil") {
+    const { data: paidPayments, error: paidError } = await supabase
+      .from("payments")
+      .select("id")
+      .eq("order_id", orderId)
+      .eq("status", "paid")
+      .limit(1);
+
+    if (paidError) return actionError(paidError.message);
+    if ((paidPayments?.length ?? 0) === 0) {
+      return actionError(
+        newStatus === "siap"
+          ? "Transaksi belum lunas: tidak bisa ditandai siap diambil"
+          : "Transaksi belum lunas: tidak bisa ditandai sudah diambil",
+      );
+    }
+  }
+
   const updatePayload: { status: string; completed_at?: string; ready_at?: string } = { status: newStatus };
   if (newStatus === "siap") {
     let canUseReadyAt = true;
@@ -67,6 +91,7 @@ export type PayOrderInput = {
 
 export type StartQrisDynamicOutput = {
   paymentId: string;
+  midtransOrderId: string;
   providerRef: string;
   qrString: string;
   imageUrl: string | null;
@@ -81,6 +106,36 @@ export type ExistingQrisDynamicOutput = {
   expiresAt: string | null;
   status: string;
 };
+
+type QrisAttemptRow = {
+  id: string;
+  status: string;
+  midtrans_order_id: string | null;
+  provider_ref: string | null;
+  qris_qr_string: string | null;
+  qris_image_url: string | null;
+  qris_expires_at: string | null;
+  created_at: string | null;
+};
+
+type ServerSupabase = Awaited<ReturnType<typeof createClient>>;
+
+async function getLatestQrisAttempt(
+  supabase: ServerSupabase,
+  orderId: string,
+): Promise<QrisAttemptRow | null> {
+  const { data } = await supabase
+    .from("payments")
+    .select(
+      "id, status, midtrans_order_id, provider_ref, qris_qr_string, qris_image_url, qris_expires_at, created_at",
+    )
+    .eq("order_id", orderId)
+    .eq("method", "qris_dynamic")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return (data as unknown as QrisAttemptRow | null) ?? null;
+}
 
 export async function getExistingQrisDynamicForOrder(
   orderId: string,
@@ -133,6 +188,10 @@ export async function startQrisDynamicForOrder(orderId: string): Promise<ActionR
 
   if (!env.APP_BASE_URL) return actionError("APP_BASE_URL belum diset");
 
+  // Internal payment writes (attach QRIS details, cancel/replace attempts) run with
+  // the service role. Clients no longer have any update path to payments.
+  const admin = createAdminClient();
+
   let shiftId: string | null = null;
   if (role !== "admin") {
     const { data: shift } = await supabase
@@ -156,6 +215,8 @@ export async function startQrisDynamicForOrder(orderId: string): Promise<ActionR
     .maybeSingle();
 
   if (orderError) return actionError(orderError.message);
+  if (!order) return actionError("Order tidak ditemukan");
+
   const receivedAt = new Date(order?.received_at ?? "");
   if (!Number.isFinite(receivedAt.getTime())) return actionError("Tanggal order tidak valid");
 
@@ -185,26 +246,49 @@ export async function startQrisDynamicForOrder(orderId: string): Promise<ActionR
 
   if (itemsError) return actionError(itemsError.message);
   const total = (items ?? []).reduce((sum, it) => sum + Number(it.subtotal ?? 0), 0);
+  if (total <= 0) return actionError("Total tagihan tidak valid");
 
-  const { data: existingPending, error: pendingError } = await supabase
-    .from("payments")
-    .select("id")
-    .eq("order_id", orderId)
-    .eq("method", "qris_dynamic")
-    .eq("status", "pending")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  // 1. Reuse the last attempt when it is still pending and not expired.
+  //    A pending attempt always means "not expired", which also guards double clicks.
+  const latest = await getLatestQrisAttempt(supabase, orderId);
+  if (latest && latest.status === "pending") {
+    const expiresMs = latest.qris_expires_at ? new Date(latest.qris_expires_at).getTime() : null;
+    const notExpired = expiresMs !== null && Number.isFinite(expiresMs) && expiresMs > Date.now();
+    if (notExpired) {
+      return success({
+        paymentId: latest.id,
+        midtransOrderId: latest.midtrans_order_id ?? "",
+        providerRef: latest.provider_ref ?? "",
+        qrString: latest.qris_qr_string ?? "",
+        imageUrl: latest.qris_image_url ?? null,
+        expiresAt: latest.qris_expires_at ?? null,
+      });
+    }
 
-  if (pendingError) return actionError(pendingError.message);
-
-  const pendingPaymentId = (existingPending as unknown as { id?: string } | null)?.id ?? null;
-
-  if (pendingPaymentId) {
-    void pendingPaymentId;
+    // Expired pending attempt: cancel it at Midtrans, then mark it failed.
+    if (latest.midtrans_order_id) {
+      try {
+        await cancelMidtransTransaction(latest.midtrans_order_id);
+      } catch {}
+    }
+    await admin
+      .from("payments")
+      .update({ status: "failed", provider_status: "cancel", paid_at: null, notes: "replaced_by_new_qr" })
+      .eq("id", latest.id)
+      .eq("status", "pending");
   }
 
-  const { data: inserted, error: insertError } = await supabase
+  // 2. Next attempt number -> a fresh, never-reused Midtrans order_id.
+  const { count } = await supabase
+    .from("payments")
+    .select("id", { count: "exact", head: true })
+    .eq("order_id", orderId)
+    .eq("method", "qris_dynamic");
+
+  const attemptNo = (count ?? 0) + 1;
+  const midtransOrderId = `${order.order_no}-${attemptNo}`;
+
+  const { data: inserted, error: insertError } = await admin
     .from("payments")
     .insert({
       order_id: orderId,
@@ -214,6 +298,7 @@ export async function startQrisDynamicForOrder(orderId: string): Promise<ActionR
       method: "qris_dynamic",
       status: "pending",
       received_by: user.id,
+      midtrans_order_id: midtransOrderId,
     })
     .select("id")
     .single();
@@ -222,15 +307,26 @@ export async function startQrisDynamicForOrder(orderId: string): Promise<ActionR
   const paymentId = inserted.id;
 
   const notificationUrl = `${env.APP_BASE_URL.replace(/\/+$/, "")}/api/webhooks/midtrans`;
-  const created = await createMidtransQrisCharge({
-    orderId: paymentId,
-    grossAmount: total,
-    notificationUrl,
-  });
+
+  let created;
+  try {
+    created = await createMidtransQrisCharge({
+      orderId: midtransOrderId,
+      grossAmount: total,
+      notificationUrl,
+      expiryMinutes: 15,
+    });
+  } catch (err) {
+    await admin
+      .from("payments")
+      .update({ status: "failed", paid_at: null, notes: "charge_failed" })
+      .eq("id", paymentId);
+    return actionError(err instanceof Error ? err.message : "Gagal membuat QRIS");
+  }
 
   const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
 
-  const { error: updateError } = await supabase
+  const { error: updateError } = await admin
     .from("payments")
     .update({
       cash_register_id: shiftId,
@@ -247,6 +343,7 @@ export async function startQrisDynamicForOrder(orderId: string): Promise<ActionR
       qris_qr_string: created.qrString,
       qris_image_url: created.qrImageUrl,
       qris_expires_at: expiresAt,
+      midtrans_order_id: midtransOrderId,
     })
     .eq("id", paymentId);
 
@@ -255,6 +352,7 @@ export async function startQrisDynamicForOrder(orderId: string): Promise<ActionR
   revalidatePath("/kasir/riwayat");
   return success({
     paymentId,
+    midtransOrderId,
     providerRef: created.providerRef,
     qrString: created.qrString,
     imageUrl: created.qrImageUrl,
@@ -275,7 +373,7 @@ export async function checkQrisDynamicPaymentStatus(
 
   const { data: payment, error } = await supabase
     .from("payments")
-    .select("id, method, status, provider")
+    .select("id, method, status, provider, midtrans_order_id")
     .eq("id", paymentId)
     .maybeSingle();
 
@@ -284,7 +382,10 @@ export async function checkQrisDynamicPaymentStatus(
   if (payment.method !== "qris_dynamic") return actionError("Metode pembayaran bukan QRIS dinamis");
   if (payment.provider !== "midtrans") return actionError("Provider pembayaran bukan Midtrans");
 
-  const data = await getMidtransTransactionStatus(paymentId);
+  const midtransOrderId =
+    (payment as unknown as { midtrans_order_id?: string | null }).midtrans_order_id ?? paymentId;
+
+  const data = await getMidtransTransactionStatus(midtransOrderId);
   const transactionStatus = typeof data.transaction_status === "string" ? data.transaction_status : null;
   const fraudStatus = typeof data.fraud_status === "string" ? data.fraud_status : null;
   const transactionId = typeof data.transaction_id === "string" ? data.transaction_id : null;
@@ -317,7 +418,10 @@ export async function checkQrisDynamicPaymentStatus(
     updatePayload.paid_at = null;
   }
 
-  const { error: updateError } = await supabase.from("payments").update(updatePayload).eq("id", paymentId);
+  // Midtrans verified the settlement above; write with the service role because
+  // clients have no update path to payments anymore.
+  const admin = createAdminClient();
+  const { error: updateError } = await admin.from("payments").update(updatePayload).eq("id", paymentId);
   if (updateError) return actionError(updateError.message || "Gagal memperbarui status pembayaran");
 
   try {
