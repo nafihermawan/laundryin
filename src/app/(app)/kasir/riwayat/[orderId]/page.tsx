@@ -1,26 +1,35 @@
-import Link from "next/link";
+import { Check, Phone } from "lucide-react";
 
-import { PageShell } from "@/components/app/page-shell";
-import { createClient } from "@/lib/supabase/server";
-import { env } from "@/lib/env";
 import { CopyUrl } from "@/components/copy-url";
+import { PageHeader } from "@/components/app/page-header";
+import { ScrollCue } from "@/components/app/scroll-cue";
+import { createClient } from "@/lib/supabase/server";
 
-import { TransactionActions } from "./transaction-actions";
+import { DetailBottomBar } from "./detail-bottom-bar";
+import { CopyOrderButton } from "./copy-order-button";
+import { LogAccordion } from "./log-accordion";
+import { StatusAccordion, type StatusStep } from "./status-accordion";
 
-function formatIDR(value: number) {
-  return new Intl.NumberFormat("id-ID", {
-    style: "currency",
-    currency: "IDR",
-    maximumFractionDigits: 0,
-  }).format(value);
+function formatDateTime(value: string) {
+  const d = new Date(value);
+  if (!Number.isFinite(d.getTime())) return "-";
+  return new Intl.DateTimeFormat("id-ID", {
+    timeZone: "Asia/Jakarta",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(d);
 }
 
-function formatDate(dateStr: string) {
-  return new Intl.DateTimeFormat("id-ID", {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone: "Asia/Jakarta",
-  }).format(new Date(dateStr));
+function formatRp(value: number) {
+  return `Rp ${new Intl.NumberFormat("id-ID").format(Math.round(value))}`;
+}
+
+function formatPhone(phone: string) {
+  return phone.replace(/\D/g, "").replace(/(.{4})/g, "$1 ").trim();
 }
 
 function getLaundryStatus(status: string) {
@@ -30,20 +39,19 @@ function getLaundryStatus(status: string) {
 function getLaundryStatusLabel(status: string) {
   const normalized = getLaundryStatus(status);
   if (normalized === "diterima") return "Diterima";
-  if (normalized === "siap") return "Siap Diambil";
-  if (normalized === "diambil") return "Sudah Diambil";
+  if (normalized === "siap") return "Siap diambil";
+  if (normalized === "diambil") return "Sudah diambil";
   return normalized;
 }
 
 function getLaundryStatusClasses(status: string) {
   const normalized = getLaundryStatus(status);
-  if (normalized === "diterima") return "bg-blue-100 text-blue-700 border-blue-200";
-  if (normalized === "siap") return "bg-emerald-100 text-emerald-700 border-emerald-200";
-  if (normalized === "diambil") return "bg-zinc-100 text-zinc-700 border-zinc-200";
-  return "bg-zinc-100 text-zinc-700 border-zinc-200";
+  if (normalized === "diterima") return "bg-blue-50 text-blue-700";
+  if (normalized === "siap") return "bg-emerald-50 text-emerald-700";
+  return "bg-slate-100 text-slate-600";
 }
 
-function getPaymentMethodLabel(method: string) {
+function paymentMethodLabel(method: string) {
   if (method === "cash") return "Cash";
   if (method === "qris_dynamic") return "QRIS Dinamis";
   if (method === "qris_manual") return "QRIS Manual";
@@ -51,47 +59,48 @@ function getPaymentMethodLabel(method: string) {
   return method;
 }
 
-function getPaymentStatusLabel(status: string) {
-  if (status === "paid") return "Lunas";
-  if (status === "pending") return "Pending";
-  if (status === "expired") return "Kedaluwarsa";
-  if (status === "failed") return "Gagal";
-  return status;
-}
-
-function getMidtransApiBase() {
-  const isProd = env.MIDTRANS_IS_PRODUCTION === "true";
-  return isProd ? "https://api.midtrans.com" : "https://api.sandbox.midtrans.com";
+function paymentStatusPill(status: string) {
+  if (status === "paid") return { label: "Lunas", classes: "bg-emerald-50 text-emerald-700" };
+  if (status === "pending") return { label: "Pending", classes: "bg-orange-50 text-amber-700" };
+  if (status === "expired") return { label: "Kedaluwarsa", classes: "bg-slate-100 text-slate-600" };
+  if (status === "failed") return { label: "Gagal", classes: "bg-slate-100 text-slate-600" };
+  return { label: status, classes: "bg-slate-100 text-slate-600" };
 }
 
 function parsePaymentNotes(notes: string | null | undefined) {
   const out: Record<string, string> = {};
   if (typeof notes !== "string") return out;
-  const parts = notes
-    .split("|")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  for (const part of parts) {
+  for (const part of notes.split("|")) {
     const idx = part.indexOf("=");
     if (idx === -1) continue;
     const key = part.slice(0, idx).trim();
     const value = part.slice(idx + 1).trim();
-    if (!key) continue;
-    out[key] = value;
+    if (key) out[key] = value;
   }
   return out;
 }
 
 function toIsoDate(value: unknown) {
   if (typeof value !== "string") return null;
-  const dt = new Date(value);
-  if (!Number.isFinite(dt.getTime())) return null;
-  return dt.toISOString();
+  const d = new Date(value);
+  return Number.isFinite(d.getTime()) ? d.toISOString() : null;
 }
 
 function isUuid(value: string) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-    value,
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+function getMidtransApiBase() {
+  const isProd = process.env.MIDTRANS_IS_PRODUCTION === "true";
+  return isProd ? "https://api.midtrans.com" : "https://api.sandbox.midtrans.com";
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section>
+      <h2 className="mx-1 mb-2 text-xs font-semibold uppercase tracking-[0.06em] text-slate-500">{title}</h2>
+      {children}
+    </section>
   );
 }
 
@@ -104,11 +113,8 @@ export default async function TransactionDetailPage({
 }) {
   const supabase = await createClient();
   const resolvedParams = await Promise.resolve(params);
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
   const orderKey = resolvedParams.orderId;
+
   const selectWithReadyAt = `
     id,
     order_no,
@@ -121,7 +127,7 @@ export default async function TransactionDetailPage({
     notes,
     customer:customers(name, phone),
     items:order_items(service_name, qty, unit, unit_price, subtotal),
-    payments:payments(id, amount, method, status, paid_at, reference_no, notes, created_at, qris_image_url, qris_expires_at, provider_ref, provider_status)
+    payments:payments(id, amount, method, status, paid_at, reference_no, notes, created_at, provider_ref, provider_status, qris_expires_at)
   `;
   const selectWithoutReadyAt = `
     id,
@@ -134,7 +140,7 @@ export default async function TransactionDetailPage({
     notes,
     customer:customers(name, phone),
     items:order_items(service_name, qty, unit, unit_price, subtotal),
-    payments:payments(id, amount, method, status, paid_at, reference_no, notes, created_at, qris_image_url, qris_expires_at, provider_ref, provider_status)
+    payments:payments(id, amount, method, status, paid_at, reference_no, notes, created_at, provider_ref, provider_status, qris_expires_at)
   `;
 
   const withReadyQuery = isUuid(orderKey)
@@ -149,27 +155,16 @@ export default async function TransactionDetailPage({
     ({ data: order, error } = await withoutReadyQuery.maybeSingle());
   }
 
-  if (error) {
+  if (error || !order) {
     return (
-      <PageShell title="Detail Transaksi">
-        <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-700">
-          {error.message}
-        </div>
-      </PageShell>
-    );
-  }
-
-  if (!order) {
-    return (
-      <PageShell title="Detail Transaksi">
-        <div className="rounded-2xl border border-zinc-200 bg-white p-4 text-sm text-zinc-700 shadow-sm">
-          {user ? (
-            <div>Order ID/No: {orderKey}</div>
-          ) : (
-            <div>Silakan login ulang lalu coba lagi.</div>
-          )}
-        </div>
-      </PageShell>
+      <div className="flex min-h-full flex-1 flex-col">
+        <PageHeader title="Detail Transaksi" fallbackHref="/kasir" />
+        <main className="mx-auto w-full max-w-6xl flex-1 px-4 pt-4">
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
+            {error ? error.message : "Transaksi tidak ditemukan."}
+          </div>
+        </main>
+      </div>
     );
   }
 
@@ -195,271 +190,292 @@ export default async function TransactionDetailPage({
     reference_no?: string | null;
     notes?: string | null;
     created_at?: string | null;
-    qris_image_url?: string | null;
-    qris_expires_at?: string | null;
     provider_ref?: string | null;
     provider_status?: string | null;
+    qris_expires_at?: string | null;
   }>;
-
-  const isPaid = payments.some((p) => p.status === "paid");
-  const orderMeta = order as unknown as { ready_at?: string | null; updated_at?: string | null };
-  const nowIso = new Date().toISOString();
-  const readyEventTs =
-    typeof orderMeta.ready_at === "string"
-      ? toIsoDate(orderMeta.ready_at)
-      : getLaundryStatus(order.status) === "siap"
-        ? toIsoDate(orderMeta.updated_at)
-        : null;
 
   const customerRaw = (order.customer ?? null) as unknown;
   const customer = (Array.isArray(customerRaw) ? customerRaw[0] : customerRaw) as
     | { name?: string; phone?: string | null }
     | null;
 
-  return (
-    <PageShell title="Detail Transaksi">
-      <div className="flex flex-col gap-6">
-        <div className="flex items-center justify-end">
-          <Link
-            href={`/kasir/nota/${order.id}`}
-            className="inline-flex h-10 items-center justify-center rounded-xl bg-indigo-600 px-3 text-sm font-semibold text-white transition hover:bg-indigo-700"
-          >
-            Nota
-          </Link>
-        </div>
+  const status = getLaundryStatus(order.status);
+  const isPaid = payments.some((p) => p.status === "paid");
+  const orderMeta = order as unknown as { ready_at?: string | null; updated_at?: string | null };
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm lg:col-span-2">
-          <div className="flex flex-col gap-3">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex flex-col">
-                <div className="text-xs font-medium text-zinc-500">Pelanggan</div>
-                <div className="mt-1 font-semibold text-zinc-900">{customer?.name ?? "Tanpa Nama"}</div>
-                <div className="text-sm text-zinc-600">{customer?.phone ?? "-"}</div>
+  const readyEventTs =
+    typeof orderMeta.ready_at === "string"
+      ? toIsoDate(orderMeta.ready_at)
+      : status === "siap"
+        ? toIsoDate(orderMeta.updated_at)
+        : null;
+
+  const completedTs = toIsoDate(order.completed_at);
+  const receivedTs = toIsoDate(order.received_at);
+
+  const steps: StatusStep[] = [
+    {
+      key: "diterima",
+      label: "Diterima",
+      time: receivedTs ? formatDateTime(receivedTs) : null,
+      done: true,
+    },
+    {
+      key: "siap",
+      label: "Siap diambil",
+      time: readyEventTs ? formatDateTime(readyEventTs) : null,
+      done: status === "siap" || status === "diambil",
+      estimasi: order.due_at ? formatDateTime(order.due_at) : null,
+    },
+    {
+      key: "diambil",
+      label: "Sudah diambil",
+      time: completedTs ? formatDateTime(completedTs) : null,
+      done: status === "diambil",
+    },
+  ];
+  const completedCount = steps.filter((s) => s.done).length;
+  const lastDone = [...steps].reverse().find((s) => s.done) ?? steps[0];
+
+  const paymentEntries = payments
+    .slice()
+    .sort((a, b) => String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")));
+
+  const logTimes: string[] = [];
+  if (readyEventTs) logTimes.push(readyEventTs);
+  if (completedTs) logTimes.push(completedTs);
+  for (const p of paymentEntries) {
+    const ts = toIsoDate(p.paid_at || p.created_at);
+    if (ts) logTimes.push(ts);
+  }
+  const logCount = (readyEventTs ? 1 : 0) + (completedTs ? 1 : 0) + paymentEntries.length;
+  const latestTs = logTimes.reduce((max, ts) => (ts > max ? ts : max), "");
+  const logLatest = latestTs ? formatDateTime(latestTs) : null;
+
+  const customerName = customer?.name ?? "Tanpa Nama";
+  const phoneDigits = customer?.phone ? customer.phone.replace(/[^\d+]/g, "") : "";
+
+  return (
+    <div className="flex min-h-full flex-1 flex-col">
+      <PageHeader title="Detail Transaksi" fallbackHref="/kasir" />
+
+      <main
+        className="mx-auto w-full max-w-6xl flex-1 px-4 pt-4"
+        style={{ paddingBottom: "calc(112px + env(safe-area-inset-bottom))" }}
+      >
+        <div className="flex flex-col gap-5">
+          {/* Ringkasan */}
+          <section className="rounded-2xl border border-slate-200 bg-white p-4">
+            <div className="flex flex-col gap-3.5">
+              <div className="flex items-center gap-2">
+                <span className="flex-1 text-[13px] tabular-nums text-slate-500">{order.order_no}</span>
+                <CopyOrderButton orderNo={order.order_no} />
               </div>
-              <div className="flex flex-col items-end gap-2">
+
+              <div className="flex items-center gap-3">
+                <div className="flex min-w-0 flex-1 flex-col">
+                  <span className="font-display text-[20px] font-bold tracking-[-0.01em] text-slate-900">
+                    {customerName}
+                  </span>
+                  {customer?.phone ? (
+                    <span className="text-sm tabular-nums text-slate-500">{formatPhone(customer.phone)}</span>
+                  ) : null}
+                </div>
+                {phoneDigits ? (
+                  <a
+                    href={`tel:${phoneDigits}`}
+                    aria-label={`Hubungi ${customerName}`}
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-slate-700 transition hover:bg-slate-50"
+                  >
+                    <Phone className="h-5 w-5" strokeWidth={2} />
+                  </a>
+                ) : null}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2.5 border-t border-slate-200 pt-3.5">
                 <span
-                  className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${getLaundryStatusClasses(
-                    order.status,
+                  className={`inline-flex h-6 items-center whitespace-nowrap rounded-full px-2.5 text-xs font-semibold ${getLaundryStatusClasses(
+                    status,
                   )}`}
                 >
-                  {getLaundryStatusLabel(order.status)}
+                  {getLaundryStatusLabel(status)}
                 </span>
-                <span
-                  className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${
-                    isPaid
-                      ? "bg-emerald-100 text-emerald-700 border-emerald-200"
-                      : "bg-amber-100 text-amber-700 border-amber-200"
-                  }`}
-                >
-                  {isPaid ? "Sudah Bayar" : "Belum Bayar"}
+                {isPaid ? (
+                  <span className="inline-flex items-center gap-1 text-[13px] font-medium text-slate-500">
+                    <Check className="h-3.5 w-3.5" strokeWidth={2.5} />
+                    Lunas
+                  </span>
+                ) : (
+                  <span className="inline-flex h-6 items-center gap-1.5 whitespace-nowrap rounded-full bg-orange-50 px-2.5 text-xs font-semibold text-amber-700">
+                    <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                    Belum bayar
+                  </span>
+                )}
+                <span className="ml-auto font-display text-[18px] font-bold tabular-nums text-slate-900">
+                  {formatRp(total)}
                 </span>
               </div>
             </div>
+          </section>
 
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="rounded-xl border border-zinc-100 bg-zinc-50 px-3 py-2">
-                <div className="text-xs font-medium text-zinc-500">Masuk</div>
-                <div className="mt-1 text-sm font-medium text-zinc-900">{formatDate(order.received_at)}</div>
-              </div>
-              <div className="rounded-xl border border-zinc-100 bg-zinc-50 px-3 py-2">
-                <div className="text-xs font-medium text-zinc-500">Estimasi</div>
-                <div className="mt-1 text-sm font-medium text-zinc-900">
-                  {order.due_at ? formatDate(order.due_at) : "-"}
-                </div>
-              </div>
-              {order.completed_at ? (
-                <div className="rounded-xl border border-zinc-100 bg-zinc-50 px-3 py-2 sm:col-span-2">
-                  <div className="text-xs font-medium text-zinc-500">Diambil pada</div>
-                  <div className="mt-1 text-sm font-medium text-emerald-700">
-                    {formatDate(order.completed_at)}
-                  </div>
-                </div>
-              ) : null}
-              {order.ready_at ? (
-                <div className="rounded-xl border border-zinc-100 bg-zinc-50 px-3 py-2 sm:col-span-2">
-                  <div className="text-xs font-medium text-zinc-500">Siap diambil pada</div>
-                  <div className="mt-1 text-sm font-medium text-sky-700">
-                    {formatDate(order.ready_at)}
-                  </div>
-                </div>
-              ) : getLaundryStatus(order.status) === "siap" ? (
-                <div className="rounded-xl border border-zinc-100 bg-zinc-50 px-3 py-2 sm:col-span-2">
-                  <div className="text-xs font-medium text-zinc-500">Siap diambil pada</div>
-                  <div className="mt-1 text-sm font-medium text-sky-700">
-                    {order.updated_at ? formatDate(order.updated_at) : "-"}
-                  </div>
-                </div>
-              ) : null}
-            </div>
-
-            <div className="overflow-hidden rounded-2xl border border-zinc-200">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-zinc-100 bg-zinc-50 text-xs font-medium text-zinc-500">
-                      <th className="px-4 py-3">Item</th>
-                      <th className="px-4 py-3">Qty</th>
-                      <th className="px-4 py-3">Harga</th>
-                      <th className="px-4 py-3 text-right">Subtotal</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-100">
-                    {items.map((it, idx) => (
-                      <tr key={idx} className="hover:bg-zinc-50/50">
-                        <td className="px-4 py-3 font-medium text-zinc-900">{it.service_name}</td>
-                        <td className="px-4 py-3 text-zinc-700">
-                          {it.qty}
-                          {it.unit}
-                        </td>
-                        <td className="px-4 py-3 text-zinc-700">{formatIDR(Number(it.unit_price ?? 0))}</td>
-                        <td className="px-4 py-3 text-right font-medium text-zinc-900">
-                          {formatIDR(Number(it.subtotal ?? 0))}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot>
-                    <tr className="border-t border-zinc-200 bg-white">
-                      <td className="px-4 py-3 text-sm font-semibold text-zinc-900" colSpan={3}>
-                        Total
-                      </td>
-                      <td className="px-4 py-3 text-right text-sm font-semibold text-zinc-900">
-                        {formatIDR(total)}
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-            </div>
-
-            {order.notes ? (
-              <div className="rounded-2xl border border-zinc-200 bg-white p-4">
-                <div className="text-xs font-medium text-zinc-500">Catatan</div>
-                <div className="mt-2 text-sm text-zinc-900">{order.notes}</div>
-              </div>
-            ) : null}
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-4">
-          <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
-            <TransactionActions
-              orderId={order.id}
-              orderNo={order.order_no}
-              customerName={customer?.name ?? "Tanpa Nama"}
-              currentStatus={order.status}
-              isPaid={isPaid}
-              total={total}
+          {/* Status cucian */}
+          <Section title="Status cucian">
+            <StatusAccordion
+              steps={steps}
+              completed={completedCount}
+              total={steps.length}
+              summaryLabel={lastDone.label}
+              summaryTime={lastDone.time}
             />
-          </div>
+          </Section>
 
-          <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
-            <div className="text-base font-semibold tracking-tight">Log Transaksi</div>
-            <div className="mt-4 flex flex-col gap-3 text-xs">
+          {/* Rincian layanan */}
+          <Section title="Rincian layanan">
+            <div className="rounded-2xl border border-slate-200 bg-white px-4 pb-4 pt-1">
+              <div className="divide-y divide-slate-200">
+                {items.map((it, idx) => {
+                  const subtotal = Number(it.subtotal ?? (it.qty ?? 0) * (it.unit_price ?? 0));
+                  return (
+                    <div key={idx} className="flex items-baseline gap-3 py-3">
+                      <div className="flex min-w-0 flex-1 flex-col">
+                        <span className="text-[15px] font-medium text-slate-900">{it.service_name}</span>
+                        <span className="text-[13px] tabular-nums text-slate-500">
+                          {it.qty} {it.unit} × {formatRp(Number(it.unit_price ?? 0))}
+                        </span>
+                      </div>
+                      <span className="shrink-0 text-[15px] font-semibold tabular-nums text-slate-900">
+                        {formatRp(subtotal)}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="flex items-baseline justify-between gap-3 border-t border-dashed border-slate-300 pt-3">
+                <span className="text-[15px] font-semibold text-slate-900">Total</span>
+                <span className="font-display text-[18px] font-bold tabular-nums text-slate-900">
+                  {formatRp(total)}
+                </span>
+              </div>
+            </div>
+          </Section>
+
+          {/* Log transaksi */}
+          <section>
+            <h2 className="mx-1 mb-2 text-xs font-semibold uppercase tracking-[0.06em] text-slate-500">
+              Log transaksi
+            </h2>
+            <LogAccordion count={logCount} latestTime={logLatest}>
+            <ol className="flex list-none flex-col gap-2">
               {readyEventTs ? (
-                <div className="rounded-xl border border-zinc-100 bg-zinc-50 px-3 py-2">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="font-semibold text-zinc-900">Status: Siap Diambil</div>
-                    <span className="text-xs font-medium text-sky-700">{formatDate(readyEventTs)}</span>
-                  </div>
-                </div>
-              ) : null}
-              {order.completed_at ? (
-                <div className="rounded-xl border border-zinc-100 bg-zinc-50 px-3 py-2">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="font-semibold text-zinc-900">Cucian Diambil</div>
-                    <span className="text-xs font-medium text-emerald-700">{formatDate(order.completed_at)}</span>
-                  </div>
-                </div>
+                <li className="flex min-h-[52px] items-center gap-3 rounded-xl border border-slate-200 px-3.5 py-3">
+                  <span className="flex-1 text-sm font-semibold text-slate-900">Status: Siap Diambil</span>
+                  <span className="whitespace-nowrap text-[13px] tabular-nums text-slate-500">
+                    {formatDateTime(readyEventTs)}
+                  </span>
+                </li>
               ) : null}
 
-              {payments.length === 0 ? (
-                <div className="text-xs text-zinc-500">Belum ada aktivitas pembayaran.</div>
+              {completedTs ? (
+                <li className="flex min-h-[52px] items-center gap-3 rounded-xl border border-slate-200 px-3.5 py-3">
+                  <span className="flex-1 text-sm font-semibold text-slate-900">Cucian Diambil</span>
+                  <span className="whitespace-nowrap text-[13px] tabular-nums text-slate-500">
+                    {formatDateTime(completedTs)}
+                  </span>
+                </li>
+              ) : null}
+
+              {paymentEntries.length === 0 ? (
+                <li className="rounded-xl border border-slate-200 px-3.5 py-3 text-[13px] text-slate-500">
+                  Belum ada aktivitas pembayaran.
+                </li>
               ) : (
-                payments
-                  .slice()
-                  .sort((a, b) => String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")))
-                  .map((p, idx) => {
-                    const expiresAtIso = toIsoDate(p.qris_expires_at);
-                    const isExpiredByTime =
-                      p.method === "qris_dynamic" &&
-                      p.status === "pending" &&
-                      typeof expiresAtIso === "string" &&
-                      expiresAtIso < nowIso;
-                    const effectiveStatus =
-                      isExpiredByTime ? "expired" : p.status;
-                    const statusClasses =
-                      effectiveStatus === "paid"
-                        ? "bg-emerald-100 text-emerald-700 border-emerald-200"
-                        : effectiveStatus === "expired" || effectiveStatus === "failed"
-                          ? "bg-zinc-100 text-zinc-700 border-zinc-200"
-                          : "bg-amber-100 text-amber-700 border-amber-200";
+                paymentEntries.map((p) => {
+                  const expiresAtIso = toIsoDate(p.qris_expires_at);
+                  const isExpiredByTime =
+                    p.method === "qris_dynamic" &&
+                    p.status === "pending" &&
+                    typeof expiresAtIso === "string" &&
+                    expiresAtIso < new Date().toISOString();
+                  const effectiveStatus = isExpiredByTime ? "expired" : p.status;
+                  const pill = paymentStatusPill(effectiveStatus);
+                  const timestamp = p.paid_at || p.created_at;
+                  const meta = parsePaymentNotes(p.notes);
+                  const cashReceived = meta.cash_received ? Number(meta.cash_received) : null;
+                  const cashChange = meta.change ? Number(meta.change) : null;
+                  const methodChangedFrom = meta.method_changed_from ?? null;
+                  const providerStatusText =
+                    isExpiredByTime && p.provider_status === "pending" ? "expired" : p.provider_status ?? null;
 
-                    const timestamp = p.paid_at || p.created_at;
-                    const midtransQrCodeUrl =
-                      typeof p.provider_ref === "string" && p.provider_ref
-                        ? `${getMidtransApiBase()}/v2/qris/${p.provider_ref}/qr-code`
-                        : null;
-                    const meta = parsePaymentNotes(p.notes);
-                    const cashReceived = meta.cash_received ? Number(meta.cash_received) : null;
-                    const cashChange = meta.change ? Number(meta.change) : null;
-                    const methodChangedFrom = meta.method_changed_from ?? null;
-                    const showRawNotes =
-                      typeof p.notes === "string" &&
-                      p.notes.length > 0 &&
-                      !(p.method === "cash" && (p.notes.includes("cash_received=") || p.notes.includes("change=")));
-                    const providerStatusText =
-                      isExpiredByTime && p.provider_status === "pending" ? "expired" : p.provider_status;
-
-                    return (
-                      <div key={idx} className="rounded-xl border border-zinc-100 bg-zinc-50 px-3 py-2">
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="font-semibold text-zinc-900">
-                            {getPaymentMethodLabel(p.method)} · {formatIDR(Number(p.amount ?? 0))}
-                          </div>
-                          <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${statusClasses}`}>
-                            {getPaymentStatusLabel(effectiveStatus)}
+                  return (
+                    <li key={p.id} className="rounded-xl border border-slate-200 p-3.5">
+                      <div className="flex flex-col gap-2.5">
+                        <div className="flex items-center gap-3">
+                          <span className="flex-1 text-sm font-semibold text-slate-900">
+                            {paymentMethodLabel(p.method)} · {formatRp(Number(p.amount ?? 0))}
+                          </span>
+                          <span
+                            className={`inline-flex h-6 items-center whitespace-nowrap rounded-full px-2.5 text-xs font-semibold ${pill.classes}`}
+                          >
+                            {pill.label}
                           </span>
                         </div>
-                        <div className="mt-1 text-xs text-zinc-600">
-                          {timestamp ? formatDate(timestamp) : "-"}
-                          {providerStatusText ? ` · ${providerStatusText}` : ""}
+
+                        <div className="flex flex-col gap-1 text-[13px] text-slate-500">
+                          <span className="tabular-nums">
+                            {timestamp ? formatDateTime(timestamp) : "-"}
+                            {providerStatusText ? ` · ${providerStatusText}` : ""}
+                          </span>
+                          {methodChangedFrom ? (
+                            <span>
+                              Metode diubah: {paymentMethodLabel(methodChangedFrom)} →{" "}
+                              {paymentMethodLabel(p.method)}
+                            </span>
+                          ) : null}
+                          {p.reference_no ? <span className="break-all">Ref: {p.reference_no}</span> : null}
                         </div>
-                        {methodChangedFrom ? (
-                          <div className="mt-1 text-xs text-zinc-600">
-                            Metode diubah: {getPaymentMethodLabel(methodChangedFrom)} → {getPaymentMethodLabel(p.method)}
-                          </div>
-                        ) : null}
-                        {p.reference_no ? <div className="mt-1 text-xs text-zinc-600">Ref: {p.reference_no}</div> : null}
-                        {p.method === "cash" && Number.isFinite(cashReceived ?? NaN) ? (
-                          <div className="mt-2 grid grid-cols-2 gap-2 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-xs text-zinc-700">
-                            <div className="text-zinc-500">Diterima</div>
-                            <div className="text-right font-semibold text-zinc-900">{formatIDR(cashReceived ?? 0)}</div>
-                            <div className="text-zinc-500">Kembalian</div>
-                            <div className="text-right font-semibold text-zinc-900">{formatIDR(cashChange ?? 0)}</div>
-                          </div>
-                        ) : null}
-                        {showRawNotes ? <div className="mt-1 text-xs text-zinc-600">{p.notes}</div> : null}
-                        {p.method === "qris_dynamic" && effectiveStatus === "pending" ? (
-                          midtransQrCodeUrl ? (
-                            <div className="mt-2 rounded-xl border border-zinc-200 bg-white p-3">
-                              <div className="text-[11px] font-semibold text-zinc-700">Midtrans QR URL</div>
-                              <div className="mt-2">
-                                <CopyUrl value={midtransQrCodeUrl} />
-                              </div>
+
+                        {p.method === "qris_dynamic" && p.provider_ref ? (
+                          <div className="rounded-[10px] border border-slate-200 bg-white p-3">
+                            <div className="text-[11px] font-semibold text-slate-600">Midtrans QR URL</div>
+                            <div className="mt-2">
+                              <CopyUrl value={`${getMidtransApiBase()}/v2/qris/${p.provider_ref}/qr-code`} />
                             </div>
-                          ) : null
+                          </div>
+                        ) : null}
+
+                        {p.method === "cash" && cashReceived !== null ? (
+                          <dl className="grid grid-cols-[1fr_auto] gap-y-2 rounded-[10px] bg-slate-100 p-3 text-sm">
+                            <dt className="text-slate-500">Diterima</dt>
+                            <dd className="text-right font-semibold tabular-nums text-slate-900">
+                              {formatRp(cashReceived)}
+                            </dd>
+                            <dt className="text-slate-500">Kembalian</dt>
+                            <dd className="text-right font-semibold tabular-nums text-slate-900">
+                              {formatRp(cashChange ?? 0)}
+                            </dd>
+                          </dl>
                         ) : null}
                       </div>
-                    );
-                  })
+                    </li>
+                  );
+                })
               )}
-            </div>
-          </div>
+            </ol>
+            </LogAccordion>
+          </section>
         </div>
-      </div>
+      </main>
+
+      <DetailBottomBar
+        orderId={order.id}
+        orderNo={order.order_no}
+        customerName={customerName}
+        status={status}
+        isPaid={isPaid}
+        total={total}
+      />
+      <ScrollCue barHeight={76} />
     </div>
-    </PageShell>
   );
 }

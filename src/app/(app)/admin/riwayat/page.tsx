@@ -1,52 +1,35 @@
 import { PageShell } from "@/components/app/page-shell";
 import { TransactionList } from "@/components/app/transaction-list";
 import { getAllTransactions } from "@/lib/data/transactions";
+import { parseFilters } from "@/lib/riwayat-filters";
 
 export const dynamic = "force-dynamic";
 
-function jakartaToday() {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Jakarta",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
-}
+type SearchParams = {
+  status?: string;
+  bayar?: string;
+  dari?: string;
+  sampai?: string;
+  filter?: string;
+  q?: string;
+};
 
 export default async function AdminRiwayatPage({
   searchParams,
 }: {
-  searchParams: Promise<{ filter?: string; status?: string }>;
+  searchParams: Promise<SearchParams>;
 }) {
   const transactions = await getAllTransactions();
   const sp = await searchParams;
 
-  let initialStatus = "semua";
-  let initialPayment: "semua" | "paid" | "unpaid" = "semua";
-  let initialFrom = "";
-  let initialTo = "";
-
-  if (sp.filter === "hari-ini") {
-    const today = jakartaToday();
-    initialFrom = today;
-    initialTo = today;
-  } else if (sp.status === "siap-diambil") {
-    initialStatus = "siap";
-  } else if (sp.status === "belum-bayar") {
-    initialPayment = "unpaid";
-  }
-
   return (
-    <PageShell title="Riwayat Transaksi">
-      <div className="flex flex-col gap-6">
-        <TransactionList
-          initialTransactions={transactions}
-          initialStatus={initialStatus}
-          initialPayment={initialPayment}
-          initialFrom={initialFrom}
-          initialTo={initialTo}
-        />
-      </div>
+    <PageShell title="Riwayat Transaksi" fallbackHref="/admin" contentClassName="pt-4">
+      <TransactionList
+        initialTransactions={transactions}
+        initialFilters={parseFilters(sp)}
+        initialQuery={sp.q ?? ""}
+        detailBasePath="/kasir/riwayat"
+      />
     </PageShell>
   );
 }

@@ -1,441 +1,413 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useCallback, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { TransactionRow } from "@/lib/data/transactions";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { ArrowDown, Check, Search, SlidersHorizontal } from "lucide-react";
+
+import { RiwayatFilterSheet } from "@/components/app/riwayat-filter-sheet";
+import { DEFAULT_FILTERS, effectiveRange, filtersToQuery, normalizeCucian, type Filters } from "@/lib/riwayat-filters";
+import type { TransactionRow } from "@/lib/data/transactions";
 
 type Transaction = TransactionRow;
 
-const statusColors: Record<string, string> = {
-  diterima: "bg-blue-100 text-blue-700 border-blue-200",
-  diproses: "bg-blue-100 text-blue-700 border-blue-200",
-  siap: "bg-emerald-100 text-emerald-700 border-emerald-200",
-  diambil: "bg-zinc-100 text-zinc-700 border-zinc-200",
-};
+const PAGE_SIZE = 10;
 
-const paymentColors: Record<"paid" | "pending", string> = {
-  paid: "bg-emerald-100 text-emerald-700 border-emerald-200",
-  pending: "bg-amber-100 text-amber-700 border-amber-200",
-};
+function formatRp(value: number) {
+  return `Rp ${new Intl.NumberFormat("id-ID").format(Math.round(value))}`;
+}
+
+function formatJam(iso: string) {
+  return new Intl.DateTimeFormat("id-ID", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "Asia/Jakarta",
+  }).format(new Date(iso));
+}
+
+function jakartaKeyOf(iso: string) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jakarta",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(iso));
+}
+
+function formatGroupDate(dateKey: string) {
+  return new Intl.DateTimeFormat("id-ID", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "Asia/Jakarta",
+  }).format(new Date(`${dateKey}T00:00:00`));
+}
+
+function orderTotal(t: Transaction) {
+  return (t.order_items ?? []).reduce((sum, item) => sum + Number(item.subtotal ?? 0), 0);
+}
+
+function isPaid(t: Transaction) {
+  return (t.payments ?? []).some((p) => p.status === "paid");
+}
+
+function cucianMatches(filter: Filters["cucian"], orderStatus: string) {
+  if (filter === "semua") return true;
+  const status = normalizeCucian(orderStatus);
+  if (filter === "siap-diambil") return status === "siap";
+  return status === filter;
+}
+
+function StatusPill({ status }: { status: string }) {
+  let classes = "bg-slate-100 text-slate-600";
+  let label = status;
+  if (status === "diterima") {
+    classes = "bg-blue-50 text-blue-700";
+    label = "Diterima";
+  } else if (status === "siap") {
+    classes = "bg-emerald-50 text-emerald-700";
+    label = "Siap diambil";
+  } else if (status === "diambil") {
+    classes = "bg-slate-100 text-slate-600";
+    label = "Sudah diambil";
+  }
+  return (
+    <span className={`inline-flex h-6 items-center whitespace-nowrap rounded-full px-2.5 text-xs font-semibold ${classes}`}>
+      {label}
+    </span>
+  );
+}
+
+function TransactionRowItem({ t, href }: { t: Transaction; href: string }) {
+  const name = t.customer?.name || "Tanpa Nama";
+  const paid = isPaid(t);
+
+  return (
+    <Link href={href} className="flex flex-col gap-2 p-3.5 transition-colors hover:bg-slate-50">
+      <div className="flex items-baseline gap-3">
+        <span className="min-w-0 flex-1 truncate text-[15px] font-semibold text-slate-900">{name}</span>
+        <span className="shrink-0 text-[15px] font-semibold text-slate-900 tabular-nums">
+          {formatRp(orderTotal(t))}
+        </span>
+      </div>
+
+      <div className="flex items-center gap-1 text-[13px] text-slate-500">
+        <span className="whitespace-nowrap font-medium">{t.order_no}</span>
+        <span>·</span>
+        <span className="tabular-nums">{formatJam(t.received_at)}</span>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2.5">
+        <StatusPill status={normalizeCucian(t.status)} />
+        {paid ? (
+          <span className="inline-flex items-center gap-1 text-xs font-medium text-slate-500">
+            <Check className="h-3.5 w-3.5" strokeWidth={2.5} />
+            Lunas
+          </span>
+        ) : (
+          <span className="inline-flex h-6 items-center gap-1.5 whitespace-nowrap rounded-full bg-orange-50 px-2.5 text-xs font-semibold text-amber-700">
+            <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+            Belum bayar
+          </span>
+        )}
+      </div>
+    </Link>
+  );
+}
+
+function ListSkeleton() {
+  return (
+    <div className="divide-y divide-slate-200 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+      {[0, 1, 2].map((i) => (
+        <div key={i} className="flex flex-col gap-2 p-3.5">
+          <div className="flex items-center justify-between gap-3">
+            <div className="h-4 w-32 animate-pulse rounded bg-slate-200" />
+            <div className="h-4 w-20 animate-pulse rounded bg-slate-200" />
+          </div>
+          <div className="h-3 w-40 animate-pulse rounded bg-slate-200" />
+          <div className="h-6 w-28 animate-pulse rounded-full bg-slate-200" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function RiwayatToolbar({
+  searchInput,
+  onSearchChange,
+  filters,
+  onApply,
+}: {
+  searchInput: string;
+  onSearchChange: (value: string) => void;
+  filters: Filters;
+  onApply: (filters: Filters) => void;
+}) {
+  const [filterOpen, setFilterOpen] = useState(false);
+  const filterButtonRef = useRef<HTMLButtonElement>(null);
+
+  return (
+    <>
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+            <Search className="h-[18px] w-[18px]" strokeWidth={2} />
+          </span>
+          <input
+            type="text"
+            value={searchInput}
+            onChange={(e) => onSearchChange(e.target.value)}
+            placeholder="Cari no. order atau nama"
+            aria-label="Cari transaksi"
+            className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-[38px] pr-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
+          />
+        </div>
+        <button
+          type="button"
+          ref={filterButtonRef}
+          onClick={() => setFilterOpen(true)}
+          aria-label="Filter tanggal dan lainnya"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50"
+        >
+          <SlidersHorizontal className="h-[18px] w-[18px]" strokeWidth={2} />
+        </button>
+      </div>
+      <RiwayatFilterSheet
+        open={filterOpen}
+        value={filters}
+        onClose={() => setFilterOpen(false)}
+        onApply={onApply}
+        returnFocusTo={filterButtonRef}
+      />
+    </>
+  );
+}
 
 export function TransactionList({
   initialTransactions,
-  initialStatus = "semua",
-  initialPayment = "semua",
-  initialFrom = "",
-  initialTo = "",
+  initialFilters = DEFAULT_FILTERS,
+  initialQuery = "",
+  detailBasePath = "/kasir/riwayat",
 }: {
   initialTransactions: Transaction[];
-  initialStatus?: string;
-  initialPayment?: "semua" | "paid" | "unpaid";
-  initialFrom?: string;
-  initialTo?: string;
+  initialFilters?: Filters;
+  initialQuery?: string;
+  detailBasePath?: string;
 }) {
   const router = useRouter();
-  const [isPending] = useTransition();
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filterStatus, setFilterStatus] = useState(initialStatus);
-  const [filterPaymentStatus, setFilterPaymentStatus] = useState<"semua" | "paid" | "unpaid">(initialPayment);
-  const [dateFrom, setDateFrom] = useState<string>(initialFrom);
-  const [dateTo, setDateTo] = useState<string>(initialTo);
-  const [page, setPage] = useState(1);
-  const [filterOpen, setFilterOpen] = useState(false);
-  const [filterHeight, setFilterHeight] = useState<number | null>(null);
-  const [detailOrder, setDetailOrder] = useState<Transaction | null>(null);
-  const [viewportHeight, setViewportHeight] = useState(0);
+  const pathname = usePathname();
 
-  const detailFrameRef = useRef<HTMLIFrameElement | null>(null);
-  const filterFrameRef = useRef<HTMLIFrameElement | null>(null);
+  const [filters, setFilters] = useState<Filters>(initialFilters);
+  const [searchInput, setSearchInput] = useState(initialQuery);
+  const [query, setQuery] = useState(initialQuery);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [isPending, startTransition] = useTransition();
+
+  const [pullY, setPullY] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+  const pullStart = useRef<number | null>(null);
+
+  const [hasScrolled, setHasScrolled] = useState(false);
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
   const transactions = initialTransactions;
 
   useEffect(() => {
-    function update() {
-      setViewportHeight(window.innerHeight || 0);
-    }
-    update();
-    window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
-  }, []);
+    const t = window.setTimeout(() => {
+      setQuery(searchInput);
+      setVisibleCount(PAGE_SIZE);
+    }, 300);
+    return () => window.clearTimeout(t);
+  }, [searchInput]);
 
   useEffect(() => {
-    function onMessage(event: MessageEvent) {
-      if (typeof window === "undefined") return;
-      try {
-        const eventUrl = new URL(event.origin);
-        const appUrl = new URL(window.location.origin);
-        const allowedHosts = new Set(["localhost", "127.0.0.1"]);
-        const hostOk =
-          eventUrl.hostname === appUrl.hostname ||
-          (allowedHosts.has(eventUrl.hostname) && allowedHosts.has(appUrl.hostname));
-        if (!hostOk) return;
-        if (eventUrl.protocol !== appUrl.protocol) return;
-        if (eventUrl.port !== appUrl.port) return;
-      } catch {
-        return;
-      }
-      const data = event.data as unknown;
-      if (!data || typeof data !== "object") return;
-      const record = data as Record<string, unknown>;
-      if (record.type === "embed:height") {
-        const h = record.height;
-        if (typeof h !== "number" || !Number.isFinite(h) || h <= 0) return;
-        const next = Math.min(Math.max(Math.round(h), 240), 2000);
-        const source = event.source as Window | null;
-        if (filterFrameRef.current?.contentWindow && source === filterFrameRef.current.contentWindow) {
-          setFilterHeight(next);
-          return;
-        }
-        return;
-      }
+    const params = filtersToQuery(filters, query);
+    const qs = params.toString();
+    window.history.replaceState(null, "", qs ? `${pathname}?${qs}` : pathname);
+  }, [filters, query, pathname]);
 
-      if (record.type === "embed:close") {
-        const source = event.source as Window | null;
-        if (detailFrameRef.current?.contentWindow && source === detailFrameRef.current.contentWindow) {
-          setDetailOrder(null);
-        }
-        return;
-      }
-
-      if (record.type === "riwayat:filters") {
-        const source = event.source as Window | null;
-        if (filterFrameRef.current?.contentWindow && source !== filterFrameRef.current.contentWindow) return;
-
-        const status = record.status;
-        const paymentStatus = record.paymentStatus;
-        const from = record.dateFrom;
-        const to = record.dateTo;
-
-        if (typeof status !== "string") return;
-        if (typeof paymentStatus !== "string") return;
-        if (typeof from !== "string") return;
-        if (typeof to !== "string") return;
-
-        const normalizedStatus =
-          status === "semua" || status === "diterima" || status === "siap" || status === "diambil"
-            ? status
-            : "semua";
-        const normalizedPaymentStatus =
-          paymentStatus === "semua" || paymentStatus === "paid" || paymentStatus === "unpaid"
-            ? paymentStatus
-            : "semua";
-        const normalizedFrom = /^\d{4}-\d{2}-\d{2}$/.test(from) ? from : "";
-        const normalizedTo = /^\d{4}-\d{2}-\d{2}$/.test(to) ? to : "";
-
-        setFilterStatus(normalizedStatus);
-        setFilterPaymentStatus(normalizedPaymentStatus);
-        setDateFrom(normalizedFrom);
-        setDateTo(normalizedTo);
-        setPage(1);
-        setFilterOpen(false);
-        setFilterHeight(null);
-      }
+  useEffect(() => {
+    function onScroll() {
+      if (window.scrollY > 8) setHasScrolled(true);
     }
-
-    window.addEventListener("message", onMessage);
-    return () => window.removeEventListener("message", onMessage);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  const updateFilterHeightFromFrame = useCallback(() => {
-    const frame = filterFrameRef.current;
-    if (!frame) return;
-    try {
-      const doc = frame.contentDocument;
-      if (!doc) return;
-      const root =
-        (doc.getElementById("embed-root") as HTMLElement | null) ??
-        (doc.body.firstElementChild as HTMLElement | null) ??
-        doc.body;
-      const h = Math.ceil(root.getBoundingClientRect().height);
-      if (!Number.isFinite(h) || h <= 0) return;
-      setFilterHeight(Math.min(Math.max(Math.round(h), 240), 2000));
-    } catch {}
-  }, []);
+  const ordered = useMemo(() => {
+    const range = effectiveRange(filters);
+    const q = query.trim().toLowerCase();
+    return transactions
+      .filter((t) => {
+        const name = (t.customer?.name || "Tanpa Nama").toLowerCase();
+        if (q && !(t.order_no.toLowerCase().includes(q) || name.includes(q))) return false;
+        if (!cucianMatches(filters.cucian, t.status)) return false;
+        if (filters.bayar === "lunas" && !isPaid(t)) return false;
+        if (filters.bayar === "belum" && isPaid(t)) return false;
+        if (range.dari || range.sampai) {
+          const key = jakartaKeyOf(t.received_at);
+          if (range.dari && key < range.dari) return false;
+          if (range.sampai && key > range.sampai) return false;
+        }
+        return true;
+      })
+      .sort((a, b) => (a.received_at < b.received_at ? 1 : -1));
+  }, [transactions, query, filters]);
 
-  function isOrderPaid(t: Transaction) {
-    return (t.payments ?? []).some((p) => p.status === "paid");
+  const visible = ordered.slice(0, visibleCount);
+
+  const groups = useMemo(() => {
+    const map = new Map<string, Transaction[]>();
+    for (const t of visible) {
+      const key = jakartaKeyOf(t.received_at);
+      const arr = map.get(key) ?? [];
+      arr.push(t);
+      map.set(key, arr);
+    }
+    return Array.from(map.entries()).map(([dateKey, items]) => ({
+      dateKey,
+      label: formatGroupDate(dateKey),
+      items,
+    }));
+  }, [visible]);
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          setVisibleCount((c) => (c < ordered.length ? Math.min(ordered.length, c + PAGE_SIZE) : c));
+        }
+      },
+      { rootMargin: "200px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [ordered.length]);
+
+  function onTouchStart(e: React.TouchEvent) {
+    pullStart.current = window.scrollY <= 0 && !refreshing ? e.touches[0].clientY : null;
   }
 
-  function getLaundryStatus(status: string) {
-    return status === "diproses" ? "diterima" : status;
+  function onTouchMove(e: React.TouchEvent) {
+    if (pullStart.current === null) return;
+    const dy = e.touches[0].clientY - pullStart.current;
+    if (dy > 0) setPullY(Math.min(dy * 0.5, 80));
   }
 
-  function getLaundryStatusLabel(status: string) {
-    const normalized = getLaundryStatus(status);
-    if (normalized === "diterima") return "Diterima";
-    if (normalized === "siap") return "Siap Diambil";
-    if (normalized === "diambil") return "Sudah Diambil";
-    return normalized;
+  function onTouchEnd() {
+    if (pullStart.current === null) return;
+    const trigger = pullY > 50;
+    pullStart.current = null;
+    if (trigger) {
+      setRefreshing(true);
+      setPullY(0);
+      startTransition(() => router.refresh());
+      window.setTimeout(() => setRefreshing(false), 900);
+    } else {
+      setPullY(0);
+    }
   }
 
-  function getPaymentLabel(t: Transaction) {
-    return isOrderPaid(t) ? "Sudah Bayar" : "Belum Bayar";
+  function applyFilters(next: Filters) {
+    setVisibleCount(PAGE_SIZE);
+    startTransition(() => setFilters(next));
   }
 
-  const filteredTransactions = transactions.filter((t) => {
-    const customerName = t.customer?.name || "Tanpa Nama";
-    const matchesSearch =
-      t.order_no.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      customerName.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus =
-      filterStatus === "semua" || getLaundryStatus(t.status) === filterStatus;
-    const paid = isOrderPaid(t);
-    const matchesPayment =
-      filterPaymentStatus === "semua" ||
-      (filterPaymentStatus === "paid" && paid) ||
-      (filterPaymentStatus === "unpaid" && !paid);
-    const receivedISO = new Date(t.received_at).toISOString().slice(0, 10);
-    const matchesFrom = dateFrom ? receivedISO >= dateFrom : true;
-    const matchesTo = dateTo ? receivedISO <= dateTo : true;
-    return matchesSearch && matchesStatus && matchesPayment && matchesFrom && matchesTo;
-  });
-
-  const pageSize = 10;
-  const pageCount = useMemo(() => {
-    const total = filteredTransactions.length;
-    return Math.max(1, Math.ceil(total / pageSize));
-  }, [filteredTransactions.length, pageSize]);
-
-  const currentPage = Math.min(page, pageCount);
-
-  const paginatedTransactions = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return filteredTransactions.slice(start, start + pageSize);
-  }, [currentPage, filteredTransactions, pageSize]);
-
-  const pageStart = filteredTransactions.length === 0 ? 0 : (currentPage - 1) * pageSize + 1;
-  const pageEnd = Math.min(currentPage * pageSize, filteredTransactions.length);
-  const maxModalHeight = viewportHeight > 0 ? Math.round(viewportHeight * 0.85) : null;
-
-  function formatDate(dateStr: string) {
-    return new Intl.DateTimeFormat("id-ID", {
-      dateStyle: "medium",
-      timeStyle: "short",
-    }).format(new Date(dateStr));
+  function resetAll() {
+    setSearchInput("");
+    setQuery("");
+    setVisibleCount(PAGE_SIZE);
+    startTransition(() => setFilters(DEFAULT_FILTERS));
   }
+
+  const remaining = ordered.length - visibleCount;
+  const showGradient = remaining > 0;
+  const showCue = remaining > 0 && !hasScrolled;
+  const isEmptyAll = transactions.length === 0;
+  const noMatch = !isEmptyAll && ordered.length === 0;
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative flex-1 sm:max-w-sm">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400">
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <circle cx="11" cy="11" r="8" />
-              <path d="m21 21-4.3-4.3" />
-            </svg>
-          </span>
-          <input
-            type="text"
-            placeholder="Cari No. Order / Nama..."
-            value={searchTerm}
-            onChange={(e) => {
-              setSearchTerm(e.target.value);
-              setPage(1);
-            }}
-            className="h-10 w-full rounded-xl border border-zinc-200 bg-white pl-10 pr-4 text-sm focus:border-sky-400 focus:outline-none focus:ring-4 focus:ring-sky-400/10"
-          />
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => {
-              router.refresh();
-            }}
-            aria-label="Refresh"
-            title="Refresh"
-            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M21 12a9 9 0 1 1-3-6.708" />
-              <path d="M21 3v6h-6" />
-            </svg>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              setFilterOpen(true);
-              setFilterHeight(null);
-            }}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 text-sm font-medium text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M22 3H2l8 9v7l4 2v-9l8-9z" />
-            </svg>
-            Filter
-          </button>
-        </div>
+    <div style={{ overscrollBehaviorY: "contain" }} onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}>
+      <div
+        aria-hidden={pullY === 0 && !refreshing}
+        className="flex items-center justify-center overflow-hidden text-xs text-slate-500 transition-[height] duration-200"
+        style={{ height: pullY > 0 ? pullY : refreshing ? 40 : 0 }}
+      >
+        {refreshing ? "Memuat ulang..." : pullY > 50 ? "Lepaskan untuk memuat ulang" : "Tarik untuk memuat ulang"}
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs sm:text-sm">
-            <thead>
-              <tr className="border-b border-zinc-100 bg-zinc-50 text-xs font-medium text-zinc-500">
-                <th className="whitespace-nowrap px-3 py-3 sm:px-4">No. Order / Tanggal</th>
-                <th className="whitespace-nowrap px-3 py-3 sm:px-4">Pelanggan</th>
-                <th className="whitespace-nowrap px-3 py-3 sm:px-4">Status Cucian</th>
-                <th className="whitespace-nowrap px-3 py-3 sm:px-4">Status Bayar</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-100">
-              {isPending ? (
-                <tr>
-                  <td colSpan={4} className="px-3 py-12 text-center text-zinc-500 sm:px-4">
-                    Memproses riwayat transaksi...
-                  </td>
-                </tr>
-              ) : filteredTransactions.length === 0 ? (
-                <tr>
-                  <td colSpan={4} className="px-3 py-12 text-center text-zinc-500 sm:px-4">
-                    Tidak ada transaksi ditemukan.
-                  </td>
-                </tr>
-              ) : (
-                paginatedTransactions.map((t) => (
-                  <tr key={t.id || t.order_no} className="group hover:bg-zinc-50/50">
-                    <td className="px-3 py-3 sm:px-4">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setDetailOrder(t);
-                        }}
-                        className="block w-full rounded-lg text-left outline-none transition hover:bg-zinc-50 focus:bg-zinc-50 focus:ring-4 focus:ring-sky-400/10"
-                      >
-                        <div className="flex flex-col">
-                          <span className="break-all font-semibold text-zinc-900">{t.order_no}</span>
-                          <span className="text-xs text-zinc-500">{formatDate(t.received_at)}</span>
-                          <span className="hidden text-xs text-zinc-500 sm:block">
-                            Dibuat oleh: {t.created_by_profile?.full_name || "User"}
-                          </span>
-                        </div>
-                      </button>
-                    </td>
-                    <td className="px-3 py-3 sm:px-4">
-                      <div className="flex flex-col">
-                        <span className="font-medium text-zinc-900">{t.customer?.name || "Tanpa Nama"}</span>
-                        <span className="hidden text-xs text-zinc-500 sm:block">{t.customer?.phone || "-"}</span>
-                      </div>
-                    </td>
-                    <td className="px-3 py-3 sm:px-4">
-                      <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${statusColors[getLaundryStatus(t.status)] || "bg-zinc-100 text-zinc-700"}`}>
-                        {getLaundryStatusLabel(t.status)}
-                      </span>
-                    </td>
-                    <td className="px-3 py-3 sm:px-4">
-                      <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${isOrderPaid(t) ? paymentColors.paid : paymentColors.pending}`}>
-                        {getPaymentLabel(t)}
-                      </span>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-        <div className="flex flex-col gap-3 border-t border-zinc-100 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="text-xs text-zinc-500">
-            Menampilkan <span className="font-medium text-zinc-700">{pageStart}</span>–
-            <span className="font-medium text-zinc-700">{pageEnd}</span> dari{" "}
-            <span className="font-medium text-zinc-700">{filteredTransactions.length}</span> transaksi
+      <div className="flex flex-col gap-4">
+        <RiwayatToolbar
+          searchInput={searchInput}
+          onSearchChange={setSearchInput}
+          filters={filters}
+          onApply={applyFilters}
+        />
+
+        {isPending || refreshing ? (
+          <ListSkeleton />
+        ) : isEmptyAll ? (
+          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-16 text-center text-[15px] text-slate-500">
+            Belum ada transaksi
           </div>
-          <div className="flex items-center justify-between gap-3 sm:justify-end">
+        ) : noMatch ? (
+          <div className="flex flex-col items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-16 text-center">
+            <p className="text-[15px] text-slate-500">Tidak ada transaksi yang cocok</p>
             <button
               type="button"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={currentPage <= 1 || isPending}
-              className="inline-flex h-9 items-center justify-center rounded-xl border border-zinc-200 bg-white px-3 text-xs font-medium text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50 disabled:opacity-60"
+              onClick={resetAll}
+              className="text-sm font-semibold text-indigo-600 underline-offset-2 hover:underline"
             >
-              Sebelumnya
-            </button>
-            <div className="text-xs text-zinc-600">
-              Halaman <span className="font-medium text-zinc-900">{currentPage}</span> /{" "}
-              <span className="font-medium text-zinc-900">{pageCount}</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
-              disabled={currentPage >= pageCount || isPending}
-              className="inline-flex h-9 items-center justify-center rounded-xl border border-zinc-200 bg-white px-3 text-xs font-medium text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50 disabled:opacity-60"
-            >
-              Berikutnya
+              Reset filter
             </button>
           </div>
-        </div>
+        ) : (
+          <div className="flex flex-col gap-4">
+            {groups.map((group) => (
+              <section key={group.dateKey}>
+                <h2 className="mx-1 mb-2 text-xs font-semibold uppercase tracking-[0.06em] text-slate-500">
+                  {group.label}
+                </h2>
+                <div className="divide-y divide-slate-200 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                  {group.items.map((t) => (
+                    <TransactionRowItem
+                      key={t.id || t.order_no}
+                      t={t}
+                      href={`${detailBasePath}/${encodeURIComponent(t.id || t.order_no)}`}
+                    />
+                  ))}
+                </div>
+              </section>
+            ))}
+            {remaining > 0 ? <div ref={sentinelRef} className="h-4" aria-hidden="true" /> : null}
+          </div>
+        )}
       </div>
 
-      {filterOpen ? (
+      {showGradient ? (
         <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/30 p-3 sm:items-center sm:p-4"
-          onMouseDown={(e) => {
-            if (e.target === e.currentTarget) {
-              setFilterOpen(false);
-              setFilterHeight(null);
-            }
-          }}
-        >
-          <div
-            className="w-full max-w-md overflow-auto rounded-2xl shadow-xl"
-            style={{
-              maxHeight: maxModalHeight ? `${maxModalHeight}px` : "85vh",
-              WebkitOverflowScrolling: "touch",
-            }}
-          >
-            <iframe
-              src={`/embed/riwayat-filter?status=${encodeURIComponent(filterStatus)}&payment=${encodeURIComponent(filterPaymentStatus)}&from=${encodeURIComponent(dateFrom)}&to=${encodeURIComponent(dateTo)}`}
-              className="w-full rounded-2xl bg-transparent"
-              style={{ height: filterHeight ? `${filterHeight}px` : "360px" }}
-              frameBorder={0}
-              scrolling="no"
-              ref={filterFrameRef}
-              onLoad={() => {
-                updateFilterHeightFromFrame();
-                window.setTimeout(updateFilterHeightFromFrame, 50);
-                window.setTimeout(updateFilterHeightFromFrame, 200);
-                window.setTimeout(updateFilterHeightFromFrame, 500);
-              }}
-            />
-          </div>
-        </div>
+          aria-hidden="true"
+          className="pointer-events-none fixed inset-x-0 bottom-0 z-30 h-[120px]"
+          style={{ background: "linear-gradient(to bottom, transparent, #F8FAFC 75%)" }}
+        />
       ) : null}
 
-      {detailOrder ? (
+      {showCue ? (
         <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/30 p-3 sm:items-center sm:p-4"
-          onMouseDown={(e) => {
-            if (e.target === e.currentTarget) {
-              setDetailOrder(null);
-            }
-          }}
+          className="fixed inset-x-0 z-40 flex justify-center transition-opacity duration-200"
+          style={{ bottom: "calc(24px + env(safe-area-inset-bottom))" }}
         >
-          {detailOrder.id || detailOrder.order_no ? (
-            <div
-              className="w-full max-w-2xl overflow-hidden rounded-2xl shadow-xl"
-              style={{
-                height: maxModalHeight ? `${maxModalHeight}px` : "85vh",
-              }}
-            >
-              <iframe
-                src={`/embed/riwayat-detail/${encodeURIComponent(detailOrder.id || detailOrder.order_no)}`}
-                className="h-full w-full rounded-2xl bg-transparent"
-                frameBorder={0}
-                scrolling="yes"
-                ref={detailFrameRef}
-              />
-            </div>
-          ) : (
-            <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-4 text-sm text-zinc-700 shadow-sm">
-              Detail tidak tersedia untuk transaksi ini.
-            </div>
-          )}
+          <button
+            type="button"
+            onClick={() => window.scrollBy({ top: Math.round(window.innerHeight * 0.9), behavior: "smooth" })}
+            className="inline-flex h-10 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-4 text-[13px] font-semibold text-slate-700 shadow-[0_6px_16px_rgba(15,23,42,0.12)]"
+          >
+            <ArrowDown className="h-4 w-4" strokeWidth={2.5} />
+            {remaining > 0 ? `Gulir untuk ${remaining} transaksi lainnya` : "Gulir untuk lihat lainnya"}
+          </button>
         </div>
       ) : null}
     </div>

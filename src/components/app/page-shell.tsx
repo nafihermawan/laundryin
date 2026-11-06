@@ -5,17 +5,19 @@ import { PageHeader } from "./page-header";
 export function PageShell({
   title,
   fallbackHref,
+  contentClassName = "",
   children,
 }: {
   title: string;
   fallbackHref?: string;
+  contentClassName?: string;
   children: ReactNode;
 }) {
   return (
     <div className="flex min-h-full flex-1 flex-col">
       <PageHeader title={title} fallbackHref={fallbackHref} />
       <main
-        className="mx-auto w-full max-w-6xl flex-1 px-4 pt-5"
+        className={`mx-auto w-full max-w-6xl flex-1 px-4 pt-5 ${contentClassName}`}
         style={{ paddingBottom: "calc(2rem + env(safe-area-inset-bottom))" }}
       >
         {children}
