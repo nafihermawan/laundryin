@@ -148,7 +148,7 @@ export function PrintBar({ receipt }: { receipt: ReceiptModel }) {
               ? printerName
                 ? `Printer: ${printerName} · ${paper}mm`
                 : `Printer belum terhubung · ${paper}mm`
-              : "Cetak thermal butuh Chrome Android"}
+              : "Cetak Bluetooth hanya didukung di Chrome Android"}
           </button>
 
           <div className="flex items-center gap-2.5">
@@ -222,7 +222,7 @@ export function PrintBar({ receipt }: { receipt: ReceiptModel }) {
               </div>
               {!supported ? (
                 <p className="mt-2 text-xs text-slate-500">
-                  Web Bluetooth hanya tersedia di Chrome Android (HTTPS). Di perangkat lain, pakai tombol
+                  Cetak Bluetooth hanya didukung di Chrome Android. Di perangkat lain, pakai tombol
                   &quot;Browser&quot;.
                 </p>
               ) : (
