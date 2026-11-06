@@ -38,6 +38,18 @@ export async function POST(request: NextRequest) {
   const userId = data.user?.id;
   if (!userId) return response;
 
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("is_active")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (profile?.is_active === false) {
+    await supabase.auth.signOut();
+    response.headers.set("location", new URL("/login?error=inactive", request.url).toString());
+    return response;
+  }
+
   const role = await getUserRole(supabase, userId);
   if (role === "admin") {
     response.headers.set("location", new URL("/admin", request.url).toString());

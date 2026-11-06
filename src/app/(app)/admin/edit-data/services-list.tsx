@@ -101,7 +101,7 @@ export function ServicesList({ initialServices }: { initialServices: ServiceRow[
             setEditingId(null);
             setFormData({ name: "", unit: "kg", base_price: 0 });
           }}
-          className="inline-flex h-9 w-full items-center justify-center rounded-lg bg-sky-500 px-4 text-sm font-medium text-white shadow-sm transition hover:bg-sky-400 sm:w-auto"
+          className="inline-flex h-11 w-full items-center justify-center rounded-xl bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700 sm:w-auto"
         >
           Tambah Layanan
         </button>
@@ -122,7 +122,7 @@ export function ServicesList({ initialServices }: { initialServices: ServiceRow[
                 required
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="h-10 rounded-xl border border-zinc-200 px-3 text-sm focus:border-sky-400 focus:outline-none focus:ring-4 focus:ring-sky-400/10"
+                className="h-10 rounded-xl border border-zinc-200 px-3 text-sm focus:border-indigo-500 focus:outline-none focus:ring-4 focus:ring-indigo-500/10"
                 placeholder="Contoh: Cuci Kering"
               />
             </label>
@@ -131,7 +131,7 @@ export function ServicesList({ initialServices }: { initialServices: ServiceRow[
               <select
                 value={formData.unit}
                 onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
-                className="h-10 rounded-xl border border-zinc-200 px-3 text-sm focus:border-sky-400 focus:outline-none focus:ring-4 focus:ring-sky-400/10"
+                className="h-10 rounded-xl border border-zinc-200 px-3 text-sm focus:border-indigo-500 focus:outline-none focus:ring-4 focus:ring-indigo-500/10"
               >
                 <option value="kg">Kg</option>
                 <option value="pcs">Pcs</option>
@@ -146,7 +146,7 @@ export function ServicesList({ initialServices }: { initialServices: ServiceRow[
                 onChange={(e) =>
                   setFormData({ ...formData, base_price: Number(e.target.value) })
                 }
-                className="h-10 rounded-xl border border-zinc-200 px-3 text-sm focus:border-sky-400 focus:outline-none focus:ring-4 focus:ring-sky-400/10"
+                className="h-10 rounded-xl border border-zinc-200 px-3 text-sm focus:border-indigo-500 focus:outline-none focus:ring-4 focus:ring-indigo-500/10"
                 placeholder="0"
               />
             </label>
@@ -164,7 +164,7 @@ export function ServicesList({ initialServices }: { initialServices: ServiceRow[
             </button>
             <button
               type="submit"
-              className="h-9 rounded-lg bg-zinc-900 px-4 text-sm font-medium text-white transition hover:bg-zinc-800"
+              className="h-11 rounded-xl bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700"
             >
               Simpan
             </button>
@@ -220,7 +220,7 @@ export function ServicesList({ initialServices }: { initialServices: ServiceRow[
                             });
                             setIsAdding(false);
                           }}
-                          className="inline-flex h-8 items-center justify-center rounded-lg border border-zinc-200 bg-white px-3 text-xs font-medium text-sky-600 transition hover:border-sky-200 hover:bg-sky-50"
+                          className="inline-flex h-8 items-center justify-center rounded-lg border border-zinc-200 bg-white px-3 text-xs font-medium text-indigo-600 transition hover:border-indigo-200 hover:bg-indigo-50"
                         >
                           Edit
                         </button>

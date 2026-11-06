@@ -11,7 +11,7 @@ export function CopyUrl({ value, className }: { value: string; className?: strin
         <input
           value={value}
           readOnly
-          className="h-10 w-full rounded-xl border border-zinc-200 bg-white px-3 text-xs text-zinc-700 outline-none"
+          className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-700 outline-none"
         />
         <button
           type="button"
@@ -22,7 +22,7 @@ export function CopyUrl({ value, className }: { value: string; className?: strin
               window.setTimeout(() => setCopied(false), 1200);
             } catch {}
           }}
-          className="inline-flex h-10 shrink-0 items-center justify-center rounded-xl border border-zinc-200 bg-white px-3 text-xs font-semibold text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
+          className="inline-flex h-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
         >
           {copied ? "Tersalin" : "Copy"}
         </button>
@@ -30,4 +30,3 @@ export function CopyUrl({ value, className }: { value: string; className?: strin
     </div>
   );
 }
-

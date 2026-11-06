@@ -1,3 +1,4 @@
+import { PageShell } from "@/components/app/page-shell";
 import { createClient } from "@/lib/supabase/server";
 
 type CashRegisterRow = {
@@ -33,39 +34,26 @@ export default async function LaporanKasirPage() {
     .select("id, user_id, opened_at, closed_at, starting_cash, expected_cash, actual_cash, variance, status")
     .order("opened_at", { ascending: false });
 
-  const registers = (data ?? []) as unknown as CashRegisterRow[];
-  const userIds = Array.from(new Set(registers.map((r) => r.user_id).filter(Boolean)));
-  const { data: profiles } = await supabase
-    .from("profiles")
-    .select("id, full_name")
-    .in("id", userIds);
-  const profileNameById = new Map((profiles ?? []).map((p) => [p.id, p.full_name?.trim() || ""]));
-
   if (error) {
     return (
-      <div className="flex flex-col gap-6">
-        <h1 className="text-2xl font-bold tracking-tight text-zinc-900">Laporan Shift Kasir</h1>
+      <PageShell title="Laporan Shift Kasir">
         <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-600">
           Gagal memuat data: {error.message}
         </div>
-      </div>
+      </PageShell>
     );
   }
 
-  return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-zinc-900">Laporan Shift Kasir</h1>
-          <p className="mt-1 text-sm text-zinc-500">
-            Riwayat buka dan tutup kasir untuk rekonsiliasi kas.
-          </p>
-        </div>
-      </div>
+  const registers = (data ?? []) as unknown as CashRegisterRow[];
+  const userIds = Array.from(new Set(registers.map((r) => r.user_id).filter(Boolean)));
+  const { data: profiles } = await supabase.from("profiles").select("id, full_name").in("id", userIds);
+  const profileNameById = new Map((profiles ?? []).map((p) => [p.id, p.full_name?.trim() || ""]));
 
-      <div className="overflow-x-auto rounded-2xl border border-zinc-200 bg-white shadow-sm">
-        <table className="w-full text-left text-sm text-zinc-600">
-          <thead className="border-b border-zinc-200 bg-zinc-50/50 text-zinc-900">
+  return (
+    <PageShell title="Laporan Shift Kasir">
+      <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
+        <table className="w-full text-left text-sm text-slate-600">
+          <thead className="border-b border-slate-200 bg-slate-50/50 text-slate-900">
             <tr>
               <th className="px-4 py-3 font-semibold">Kasir</th>
               <th className="px-4 py-3 font-semibold">Waktu Buka</th>
@@ -77,41 +65,54 @@ export default async function LaporanKasirPage() {
               <th className="px-4 py-3 font-semibold">Status</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-zinc-100">
-            {registers?.length === 0 ? (
+          <tbody className="divide-y divide-slate-100">
+            {registers.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-zinc-500">
+                <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
                   Belum ada data shift kasir.
                 </td>
               </tr>
             ) : (
-              registers?.map((reg) => (
-                <tr key={reg.id} className="transition-colors hover:bg-zinc-50/50">
-                  <td className="px-4 py-3 font-medium text-zinc-900">
+              registers.map((reg) => (
+                <tr key={reg.id} className="transition-colors hover:bg-slate-50/50">
+                  <td className="px-4 py-3 font-medium text-slate-900">
                     {profileNameById.get(reg.user_id) || "Tanpa Nama"}
                   </td>
-                  <td className="px-4 py-3">
-                    {new Date(reg.opened_at).toLocaleString("id-ID")}
-                  </td>
+                  <td className="px-4 py-3">{new Date(reg.opened_at).toLocaleString("id-ID")}</td>
                   <td className="px-4 py-3">
                     {reg.closed_at ? new Date(reg.closed_at).toLocaleString("id-ID") : "-"}
                   </td>
                   <td className="px-4 py-3">{formatIDR(reg.starting_cash)}</td>
-                  <td className="px-4 py-3">{reg.expected_cash != null ? formatIDR(reg.expected_cash) : "-"}</td>
-                  <td className="px-4 py-3">{reg.actual_cash != null ? formatIDR(reg.actual_cash) : "-"}</td>
+                  <td className="px-4 py-3">
+                    {reg.expected_cash != null ? formatIDR(reg.expected_cash) : "-"}
+                  </td>
+                  <td className="px-4 py-3">
+                    {reg.actual_cash != null ? formatIDR(reg.actual_cash) : "-"}
+                  </td>
                   <td className="px-4 py-3">
                     {reg.variance != null ? (
-                      <span className={`font-medium ${reg.variance === 0 ? "text-emerald-600" : reg.variance < 0 ? "text-red-600" : "text-amber-600"}`}>
-                        {reg.variance > 0 ? "+" : ""}{formatIDR(reg.variance)}
+                      <span
+                        className={`font-medium ${
+                          reg.variance === 0
+                            ? "text-emerald-600"
+                            : reg.variance < 0
+                              ? "text-red-600"
+                              : "text-amber-600"
+                        }`}
+                      >
+                        {reg.variance > 0 ? "+" : ""}
+                        {formatIDR(reg.variance)}
                       </span>
                     ) : (
                       "-"
                     )}
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
-                      reg.status === "open" ? "bg-blue-100 text-blue-700" : "bg-zinc-100 text-zinc-700"
-                    }`}>
+                    <span
+                      className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
+                        reg.status === "open" ? "bg-indigo-50 text-indigo-600" : "bg-slate-100 text-slate-700"
+                      }`}
+                    >
                       {reg.status === "open" ? "Aktif" : "Selesai"}
                     </span>
                   </td>
@@ -121,6 +122,6 @@ export default async function LaporanKasirPage() {
           </tbody>
         </table>
       </div>
-    </div>
+    </PageShell>
   );
 }

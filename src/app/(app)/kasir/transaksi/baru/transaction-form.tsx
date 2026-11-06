@@ -428,7 +428,7 @@ export function TransactionForm() {
                   value={customerName}
                   onChange={(e) => setCustomerName(e.target.value)}
                   placeholder="Nama pelanggan"
-                  className="h-11 rounded-xl border border-zinc-200 bg-white px-4 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-sky-400/70 focus:ring-4 focus:ring-sky-400/10"
+                  className="h-11 rounded-xl border border-zinc-200 bg-white px-4 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
                   required
                 />
               </label>
@@ -440,7 +440,7 @@ export function TransactionForm() {
                   onChange={(e) => setCustomerPhone(e.target.value)}
                   inputMode="tel"
                   placeholder="08xxxxxxxxxx"
-                  className="h-11 rounded-xl border border-zinc-200 bg-white px-4 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-sky-400/70 focus:ring-4 focus:ring-sky-400/10"
+                  className="h-11 rounded-xl border border-zinc-200 bg-white px-4 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
                   required
                 />
               </label>
@@ -452,7 +452,7 @@ export function TransactionForm() {
                 value={customerNote}
                 onChange={(e) => setCustomerNote(e.target.value)}
                 placeholder="Catatan tambahan (opsional)"
-                className="min-h-[96px] rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-sky-400/70 focus:ring-4 focus:ring-sky-400/10"
+                className="min-h-[96px] rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
               />
             </label>
           </div>
@@ -519,7 +519,7 @@ export function TransactionForm() {
                               )
                             );
                           }}
-                          className="h-11 rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none focus:border-sky-400/70 focus:ring-4 focus:ring-sky-400/10"
+                          className="h-11 rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
                         >
                           <option value="" disabled>
                             Pilih layanan
@@ -573,7 +573,7 @@ export function TransactionForm() {
                                 )
                               }
                               inputMode="decimal"
-                              className="h-11 rounded-xl border border-zinc-200 bg-white px-4 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-sky-400/70 focus:ring-4 focus:ring-sky-400/10"
+                              className="h-11 rounded-xl border border-zinc-200 bg-white px-4 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
                             />
                             <div className="text-xs text-zinc-500">
                               Subtotal: {formatIDR(lineTotal)}
@@ -694,7 +694,7 @@ export function TransactionForm() {
             
             <div className="flex items-center justify-between gap-4 border-t border-zinc-100 pt-3">
               <span className="text-zinc-600 font-medium">Total</span>
-              <span className="text-base font-semibold tracking-tight text-sky-600">
+              <span className="text-base font-semibold tracking-tight text-indigo-600">
                 {formatIDR(summary.total)}
               </span>
             </div>
@@ -723,7 +723,7 @@ export function TransactionForm() {
                   type="datetime-local"
                   value={dueAt}
                   onChange={(e) => setDueAt(e.target.value)}
-                  className="h-11 rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none focus:border-sky-400/70 focus:ring-4 focus:ring-sky-400/10"
+                  className="h-11 rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
                 />
               </label>
             </div>
@@ -744,7 +744,7 @@ export function TransactionForm() {
                   setPaymentMethod(next);
                   if (next === "cash" && cashReceived.trim() === "") setCashReceived(String(summary.total));
                 }}
-                className="h-11 rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none focus:border-sky-400/70 focus:ring-4 focus:ring-sky-400/10"
+                className="h-11 rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
               >
                 <option value="" disabled hidden>
                   Pilih metode pembayaran
@@ -768,7 +768,7 @@ export function TransactionForm() {
                   onChange={(e) => setCashReceived(e.target.value)}
                   inputMode="numeric"
                   placeholder={String(summary.total)}
-                  className="h-11 rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none focus:border-sky-400/70 focus:ring-4 focus:ring-sky-400/10"
+                  className="h-11 rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
                 />
                 <span className="text-xs text-zinc-500">
                   Kembalian: {formatIDR(toNumber(cashReceived) - summary.total)}
@@ -782,7 +782,7 @@ export function TransactionForm() {
               type="button"
               disabled={!canSubmit || isSaving}
               onClick={handleSave}
-              className="inline-flex h-11 items-center justify-center rounded-xl bg-zinc-900 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-200 disabled:text-zinc-500"
+              className="inline-flex h-11 items-center justify-center rounded-xl bg-indigo-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
             >
               {isSaving
                 ? "Memproses..."
@@ -804,12 +804,15 @@ export function TransactionForm() {
       </aside>
       </div>
 
-      <div className="fixed inset-x-0 bottom-14 z-30 lg:hidden">
+      <div
+        className="fixed inset-x-0 bottom-0 z-30 lg:hidden"
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      >
         <div className="mx-auto w-full max-w-6xl px-3 pb-2 sm:px-4">
           <div className="flex items-center justify-between rounded-2xl border border-zinc-200 bg-white/95 px-4 py-3 shadow-sm backdrop-blur">
             <div className="flex flex-col">
               <div className="text-xs font-medium text-zinc-500">Total</div>
-              <div className="text-base font-semibold tracking-tight text-sky-600">
+              <div className="text-base font-semibold tracking-tight text-indigo-600">
                 {formatIDR(summary.total)}
               </div>
             </div>
@@ -931,7 +934,7 @@ export function TransactionForm() {
                     setCheckingQris(false);
                   }
                 }}
-                className="inline-flex h-10 w-full items-center justify-center rounded-xl bg-zinc-900 px-4 text-xs font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-400"
+                className="inline-flex h-10 w-full items-center justify-center rounded-xl bg-indigo-600 px-4 text-xs font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300"
               >
                 {qrisPaid ? "Sudah Dibayar" : checkingQris ? "Mengecek..." : "Cek Status Pembayaran"}
               </button>

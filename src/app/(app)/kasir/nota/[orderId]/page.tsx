@@ -1,8 +1,9 @@
 import { notFound } from "next/navigation";
 
+import { PageHeader } from "@/components/app/page-header";
 import { createClient } from "@/lib/supabase/server";
 
-import { PrintButton } from "./print-button";
+import { PrintBar } from "./print-bar";
 
 function isUuid(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
@@ -83,17 +84,15 @@ export default async function NotaPage({
     | null;
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold tracking-tight">Nota</h1>
-          <p className="text-sm text-zinc-600">{order.order_no}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <PrintButton />
-        </div>
+    <div className="flex min-h-full flex-1 flex-col">
+      <div className="print:hidden">
+        <PageHeader title="Nota" />
       </div>
-
+      <main
+        className="mx-auto w-full max-w-6xl flex-1 px-4 pt-5"
+        style={{ paddingBottom: "calc(96px + env(safe-area-inset-bottom))" }}
+      >
+      <div className="flex flex-col gap-6">
       <div className="mx-auto w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm print:border-0 print:shadow-none">
         <div className="flex flex-col items-center gap-1">
           <div className="text-base font-semibold tracking-tight">laundry.in</div>
@@ -180,6 +179,9 @@ export default async function NotaPage({
           Terima kasih.
         </div>
       </div>
+      </div>
+      </main>
+      <PrintBar />
     </div>
   );
 }

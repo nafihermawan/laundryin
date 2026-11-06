@@ -20,7 +20,8 @@ export async function getAllTransactions(): Promise<TransactionRow[]> {
       received_at,
       created_by,
       customer:customers(name, phone),
-      payments(status)
+      payments(amount, status),
+      order_items(subtotal)
     `)
     .order("created_at", { ascending: false });
 

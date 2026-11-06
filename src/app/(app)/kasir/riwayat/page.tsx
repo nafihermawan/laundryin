@@ -1,21 +1,35 @@
-import { TransactionList } from "./transaction-list";
+import { PageShell } from "@/components/app/page-shell";
+import { TransactionList } from "@/components/app/transaction-list";
 import { getAllTransactions } from "@/lib/data/transactions";
+import { parseFilters } from "@/lib/riwayat-filters";
 
 export const dynamic = "force-dynamic";
 
-export default async function KasirRiwayatPage() {
+type SearchParams = {
+  status?: string;
+  bayar?: string;
+  dari?: string;
+  sampai?: string;
+  filter?: string;
+  q?: string;
+};
+
+export default async function KasirRiwayatPage({
+  searchParams,
+}: {
+  searchParams: Promise<SearchParams>;
+}) {
   const transactions = await getAllTransactions();
+  const sp = await searchParams;
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Riwayat Transaksi</h1>
-        <p className="text-sm text-zinc-600">
-          Kelola transaksi masuk, pantau status pengerjaan, dan cetak ulang nota.
-        </p>
-      </div>
-
-      <TransactionList initialTransactions={transactions} />
-    </div>
+    <PageShell title="Riwayat Transaksi" fallbackHref="/kasir" contentClassName="pt-4">
+      <TransactionList
+        initialTransactions={transactions}
+        initialFilters={parseFilters(sp)}
+        initialQuery={sp.q ?? ""}
+        detailBasePath="/kasir/riwayat"
+      />
+    </PageShell>
   );
 }
