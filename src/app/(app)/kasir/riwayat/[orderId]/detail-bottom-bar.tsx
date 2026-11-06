@@ -316,8 +316,8 @@ export function DetailBottomBar({
               {orderNo} · {customerName}
             </p>
             <div className="mt-5 flex flex-col gap-2">
-              <Button disabled={changing} onClick={() => changeStatus(action.next)}>
-                {changing ? "Memproses..." : "Ya, lanjutkan"}
+              <Button loading={changing} loadingText="Memproses…" onClick={() => changeStatus(action.next)}>
+                Ya, lanjutkan
               </Button>
               <Button variant="outline" onClick={() => setConfirmOpen(false)}>
                 Batal
@@ -526,8 +526,12 @@ export function DetailBottomBar({
                 <Button variant="outline" onClick={() => setPayingOpen(false)}>
                   Batal
                 </Button>
-                <Button onClick={handlePayConfirm} disabled={isPaying || isGeneratingQris}>
-                  {isPaying ? "Memproses..." : "Konfirmasi Bayar"}
+                <Button
+                  onClick={handlePayConfirm}
+                  loading={isPaying || isGeneratingQris}
+                  loadingText="Memproses…"
+                >
+                  Konfirmasi Bayar
                 </Button>
               </div>
             ) : null}

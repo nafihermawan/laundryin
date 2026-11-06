@@ -19,6 +19,7 @@ export function AccountScreen({
   version: string;
 }) {
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
   const initial = name.trim().charAt(0).toUpperCase() || "?";
   const roleLabel = role === "admin" ? "Admin" : "Kasir";
 
@@ -61,7 +62,7 @@ export function AccountScreen({
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
           onMouseDown={(e) => {
-            if (e.target === e.currentTarget) setConfirmOpen(false);
+            if (e.target === e.currentTarget && !loggingOut) setConfirmOpen(false);
           }}
         >
           <div
@@ -77,8 +78,17 @@ export function AccountScreen({
               Kamu akan keluar dari sesi saat ini dan perlu masuk kembali.
             </p>
             <div className="mt-5 flex flex-col gap-2">
-              <Button onClick={() => window.location.assign("/logout")}>Ya, keluar</Button>
-              <Button variant="outline" onClick={() => setConfirmOpen(false)}>
+              <Button
+                loading={loggingOut}
+                loadingText="Keluar…"
+                onClick={() => {
+                  setLoggingOut(true);
+                  window.location.assign("/logout");
+                }}
+              >
+                Ya, keluar
+              </Button>
+              <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={loggingOut}>
                 Batal
               </Button>
             </div>

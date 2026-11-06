@@ -187,8 +187,8 @@ export function PenggunaDetail({
 
           {errors.form ? <p className="text-sm text-red-600">{errors.form}</p> : null}
 
-          <Button type="submit" size="lg" fullWidth disabled={saving}>
-            {saving ? "Menyimpan..." : "Simpan perubahan"}
+          <Button type="submit" size="lg" fullWidth loading={saving} loadingText="Menyimpan…">
+            Simpan perubahan
           </Button>
         </div>
       </form>
@@ -254,8 +254,8 @@ export function PenggunaDetail({
               </div>
             </Field>
             <div className="flex flex-col gap-2">
-              <Button onClick={onResetPassword} disabled={resetting}>
-                {resetting ? "Menyimpan..." : "Simpan kata sandi"}
+              <Button onClick={onResetPassword} loading={resetting} loadingText="Menyimpan…">
+                Simpan kata sandi
               </Button>
               <Button variant="outline" onClick={() => setResetOpen(false)}>
                 Batal
@@ -276,8 +276,8 @@ export function PenggunaDetail({
               : `${name} akan bisa masuk kembali ke aplikasi.`}
           </p>
           <div className="mt-4 flex flex-col gap-2">
-            <Button onClick={onToggleActive} disabled={toggling}>
-              {toggling ? "Memproses..." : user.is_active ? "Ya, nonaktifkan" : "Ya, aktifkan"}
+            <Button onClick={onToggleActive} loading={toggling} loadingText="Memproses…">
+              {user.is_active ? "Ya, nonaktifkan" : "Ya, aktifkan"}
             </Button>
             <Button variant="outline" onClick={() => setActiveOpen(false)}>
               Batal

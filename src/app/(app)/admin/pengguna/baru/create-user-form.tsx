@@ -124,8 +124,8 @@ export function CreateUserForm() {
 
       {errors.form ? <p className="text-sm text-red-600">{errors.form}</p> : null}
 
-      <Button type="submit" size="lg" fullWidth disabled={submitting}>
-        {submitting ? "Menyimpan..." : "Simpan pengguna"}
+      <Button type="submit" size="lg" fullWidth loading={submitting} loadingText="Menyimpan…">
+        Simpan pengguna
       </Button>
     </form>
   );

@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-import { ToastProvider } from "@/components/ui/toast";
+import { OfflineBanner } from "@/components/app/offline-banner";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function AppLayout({
@@ -27,8 +27,9 @@ export default async function AppLayout({
   }
 
   return (
-    <ToastProvider>
+    <>
+      <OfflineBanner />
       <div className="flex min-h-full flex-1 flex-col bg-slate-50 text-slate-900">{children}</div>
-    </ToastProvider>
+    </>
   );
 }

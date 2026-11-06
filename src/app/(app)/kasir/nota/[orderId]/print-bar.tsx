@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, Printer } from "lucide-react";
+import { Printer } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
@@ -20,7 +20,11 @@ export function PrintBar() {
           setPrinting(false);
         } catch {
           setPrinting(false);
-          show("Gagal membuka dialog cetak", { actionLabel: "Coba lagi", onAction: doPrint });
+          show("Gagal membuka dialog cetak", {
+            type: "error",
+            actionLabel: "Coba lagi",
+            onAction: doPrint,
+          });
         }
       }, 50);
     });
@@ -32,18 +36,9 @@ export function PrintBar() {
         className="mx-auto flex w-full max-w-6xl items-center justify-end px-4 pt-3"
         style={{ paddingBottom: "calc(16px + env(safe-area-inset-bottom))" }}
       >
-        <Button size="lg" onClick={doPrint} disabled={printing}>
-          {printing ? (
-            <>
-              <Loader2 className="h-[18px] w-[18px] animate-spin" strokeWidth={2} />
-              Mencetak…
-            </>
-          ) : (
-            <>
-              <Printer className="h-[18px] w-[18px]" strokeWidth={2} />
-              Cetak
-            </>
-          )}
+        <Button size="lg" onClick={doPrint} loading={printing} loadingText="Mencetak…">
+          <Printer className="h-[18px] w-[18px]" strokeWidth={2} />
+          Cetak
         </Button>
       </div>
     </div>

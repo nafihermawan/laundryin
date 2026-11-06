@@ -1,6 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Plus_Jakarta_Sans } from "next/font/google";
+import NextTopLoader from "nextjs-toploader";
 import "./globals.css";
+
+import { Providers } from "@/components/providers";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -39,7 +42,10 @@ export default function RootLayout({
       lang="id"
       className={`${inter.variable} ${plusJakartaSans.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <NextTopLoader color="#4F46E5" height={3} showSpinner={false} />
+        <Providers>{children}</Providers>
+      </body>
     </html>
   );
 }

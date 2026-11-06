@@ -212,8 +212,12 @@ export function ShiftCard({
               ) : null}
 
               <div className="flex flex-col gap-2">
-                <Button onClick={submit} disabled={submitting}>
-                  {submitting ? "Memproses..." : dialog === "open" ? "Buka shift" : "Tutup shift"}
+                <Button
+                  onClick={submit}
+                  loading={submitting}
+                  loadingText={dialog === "open" ? "Membuka shift…" : "Menutup shift…"}
+                >
+                  {dialog === "open" ? "Buka shift" : "Tutup shift"}
                 </Button>
                 <Button variant="outline" onClick={() => setDialog(null)}>
                   Batal
