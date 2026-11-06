@@ -1,949 +1,499 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { saveTransaction } from "./actions";
+import { useRouter } from "next/navigation";
+import { CalendarDays, Check, Plus, Trash2 } from "lucide-react";
+
+import { PageHeader } from "@/components/app/page-header";
+import { Button } from "@/components/ui/button";
+import { Field, inputClass } from "@/components/ui/field";
+import { QtyStepper } from "@/components/ui/qty-stepper";
+import { ServiceSelect, type ServiceOption } from "@/components/ui/service-select";
+import { useToast } from "@/components/ui/toast";
 import { createClient } from "@/lib/supabase/browser";
-import { QRCodeCanvas } from "qrcode.react";
+import { useKeyboardOpen } from "@/lib/use-keyboard-open";
 
-type Unit = "kg" | "pcs";
-
-type ServiceOption = {
-  id: string;
-  name: string;
-  unit: string;
-  base_price: number;
-};
+import { saveTransaction } from "./actions";
 
 type ItemRow = {
   id: string;
+  serviceId: string | null;
   serviceName: string;
-  unit: Unit;
+  unit: string;
   qty: number;
   price: number;
 };
 
-function toNumber(value: unknown) {
-  const n = typeof value === "number" ? value : Number(String(value ?? ""));
-  return Number.isFinite(n) ? n : 0;
+function formatRp(value: number) {
+  return `Rp ${new Intl.NumberFormat("id-ID").format(Math.round(value))}`;
 }
 
-function formatIDR(value: number) {
-  return new Intl.NumberFormat("id-ID", {
-    style: "currency",
-    currency: "IDR",
-    maximumFractionDigits: 0,
-  }).format(value);
+function formatPhone(digits: string) {
+  return digits.replace(/(.{4})/g, "$1 ").trim();
 }
 
-const paymentOptions = [
-  { value: "cash", label: "Cash" },
-  { value: "qris_dynamic", label: "QRIS Dinamis" },
-] as const;
+function toLocalInput(date: Date) {
+  const off = date.getTimezoneOffset() * 60000;
+  return new Date(date.getTime() - off).toISOString().slice(0, 16);
+}
+
+function addDays(date: Date, days: number) {
+  const d = new Date(date);
+  d.setDate(d.getDate() + days);
+  return d;
+}
+
+function formatDisplay(localStr: string) {
+  if (!localStr) return "-";
+  const d = new Date(localStr);
+  if (!Number.isFinite(d.getTime())) return "-";
+  return new Intl.DateTimeFormat("id-ID", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(d);
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section>
+      <h2 className="mx-1 mb-2 text-xs font-semibold uppercase tracking-[0.06em] text-slate-500">{title}</h2>
+      {children}
+    </section>
+  );
+}
+
+let itemSeq = 1;
+function newItem(): ItemRow {
+  return { id: `item-${itemSeq++}`, serviceId: null, serviceName: "", unit: "kg", qty: 1, price: 0 };
+}
 
 export function TransactionForm() {
-  type PaymentMethod = (typeof paymentOptions)[number]["value"];
-  const [mounted, setMounted] = useState(false);
-  const nextItemIdRef = useRef(1);
-  const [dbServices, setDbServices] = useState<ServiceOption[]>([]);
+  const router = useRouter();
+  const { show } = useToast();
+  const keyboardOpen = useKeyboardOpen();
 
-  useEffect(() => {
-    const supabase = createClient();
-    async function fetchServices() {
-      const { data } = await supabase
-        .from("services")
-        .select("*")
-        .eq("is_active", true)
-        .order("name");
-      if (data) setDbServices(data);
-      setMounted(true);
-    }
-    fetchServices();
-  }, []);
+  const [services, setServices] = useState<ServiceOption[]>([]);
 
-  const [customerName, setCustomerName] = useState("");
-  const [customerPhone, setCustomerPhone] = useState("");
-  const [customerNote, setCustomerNote] = useState("");
   const [receivedAt, setReceivedAt] = useState("");
+  const [dueAt, setDueAt] = useState("");
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [note, setNote] = useState("");
+  const [showNote, setShowNote] = useState(false);
+  const [items, setItems] = useState<ItemRow[]>([newItem()]);
+  const [openSelectId, setOpenSelectId] = useState<string | null>(null);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [confirmLeave, setConfirmLeave] = useState(false);
+
+  const nameRef = useRef<HTMLInputElement>(null);
+  const phoneRef = useRef<HTMLInputElement>(null);
+  const itemsRef = useRef<HTMLDivElement>(null);
+  const dueRef = useRef<HTMLInputElement>(null);
+  const noteRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    const updateTime = () => {
-      const now = new Date();
-      const tzOffset = now.getTimezoneOffset() * 60000;
-      const localISOTime = new Date(now.getTime() - tzOffset).toISOString().slice(0, 16);
-      setReceivedAt(localISOTime);
-    };
-    
-    updateTime();
-    const interval = setInterval(updateTime, 60000);
-    return () => clearInterval(interval);
+    const supabase = createClient();
+    supabase
+      .from("services")
+      .select("id, name, unit, base_price")
+      .eq("is_active", true)
+      .order("name")
+      .then(({ data }) => {
+        if (data) setServices(data as ServiceOption[]);
+      });
   }, []);
 
-  const [dueAt, setDueAt] = useState(() => {
-    const d = new Date();
-    d.setDate(d.getDate() + 2);
-    return d.toISOString().slice(0, 16);
-  });
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | "">("");
-  const [cashReceived, setCashReceived] = useState("");
-
-  const [items, setItems] = useState<ItemRow[]>(() => [
-    { id: "0", serviceName: "", unit: "kg", qty: 1, price: 0 },
-  ]);
-
-  const summary = useMemo(() => {
-    const lineTotals = items.map((it) => Math.max(0, it.qty) * Math.max(0, it.price));
-    const total = lineTotals.reduce((a, b) => a + b, 0);
-    const totalQty = items.reduce((a, b) => a + Math.max(0, b.qty), 0);
-    return { lineTotals, total, totalQty, itemCount: items.length };
-  }, [items]);
-
-  const canSubmit = useMemo(() => {
-    if (!customerName.trim()) return false;
-    if (!customerPhone.trim()) return false;
-    if (items.length === 0) return false;
-    if (!items.some((it) => it.serviceName.trim() && it.qty > 0)) return false;
-    if (!paymentMethod) return false;
-    if (paymentMethod === "cash") {
-      const received = toNumber(cashReceived);
-      if (!Number.isFinite(received)) return false;
-      if (received < summary.total) return false;
-    }
-    return true;
-  }, [cashReceived, customerName, customerPhone, items, paymentMethod, summary.total]);
-
-  const [isSaving, setIsSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
-  const [qrisDynamic, setQrisDynamic] = useState<{
-    orderNo: string;
-    paymentId: string;
-    providerRef: string;
-    qrString: string;
-    imageUrl: string | null;
-    expiresAt: string | null;
-  } | null>(null);
-  const [qrisPaid, setQrisPaid] = useState(false);
-  const [checkingQris, setCheckingQris] = useState(false);
-  const [qrisNotice, setQrisNotice] = useState<{
-    type: "info" | "error" | "success";
-    message: string;
-  } | null>(null);
-  const [qrisNowMs, setQrisNowMs] = useState<number>(() => Date.now());
-  const showQrisDebug = process.env.NEXT_PUBLIC_QRIS_DEBUG === "true";
-  const simulatorImageUrl = qrisDynamic?.imageUrl ?? null;
-
-  const qrisExpiresAtMs = useMemo(() => {
-    const raw = qrisDynamic?.expiresAt;
-    if (typeof raw !== "string" || !raw) return null;
-    const ms = new Date(raw).getTime();
-    return Number.isFinite(ms) ? ms : null;
-  }, [qrisDynamic?.expiresAt]);
-
-  const qrisCountdown = useMemo(() => {
-    if (!qrisExpiresAtMs) return null;
-    const remainingMs = qrisExpiresAtMs - qrisNowMs;
-    const clamped = Math.max(0, remainingMs);
-    const totalSeconds = Math.floor(clamped / 1000);
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = totalSeconds % 60;
-    const pad2 = (n: number) => String(n).padStart(2, "0");
-    const timeLeft = hours > 0 ? `${hours}:${pad2(minutes)}:${pad2(seconds)}` : `${pad2(minutes)}:${pad2(seconds)}`;
-    return { remainingMs, timeLeft };
-  }, [qrisExpiresAtMs, qrisNowMs]);
-
   useEffect(() => {
-    if (!qrisDynamic) return;
-    if (!qrisExpiresAtMs) return;
-    if (qrisPaid) return;
-
-    setQrisNowMs(Date.now());
-    const t = window.setInterval(() => {
-      setQrisNowMs(Date.now());
-    }, 1000);
-    return () => window.clearInterval(t);
-  }, [qrisDynamic, qrisExpiresAtMs, qrisPaid]);
-
-  useEffect(() => {
-    if (!saveError && !saveSuccess) return;
-    const t = window.setTimeout(() => {
-      setSaveError(null);
-      setSaveSuccess(null);
-    }, 7000);
-    return () => window.clearTimeout(t);
-  }, [saveError, saveSuccess]);
-
-  useEffect(() => {
-    if (!qrisDynamic) return;
-    const paymentId = qrisDynamic.paymentId;
-    const supabase = createClient();
-    let cancelled = false;
-
-    async function fetchCurrent() {
-      const { data } = await supabase
-        .from("payments")
-        .select("status")
-        .eq("id", paymentId)
-        .maybeSingle();
-      if (cancelled) return;
-      if (data?.status === "paid") setQrisPaid(true);
-    }
-
-    fetchCurrent();
-
-    const channel = supabase
-      .channel(`payments:${paymentId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "payments",
-          filter: `id=eq.${paymentId}`,
-        },
-        (payload: unknown) => {
-          const nextStatus = (payload as { new?: { status?: unknown } })?.new?.status;
-          if (nextStatus === "paid") setQrisPaid(true);
-        },
-      )
-      .subscribe();
-
-    return () => {
-      cancelled = true;
-      supabase.removeChannel(channel);
-    };
-  }, [qrisDynamic]);
-
-  useEffect(() => {
-    if (!qrisDynamic) return;
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key !== "Escape") return;
-      setQrisDynamic(null);
-      setQrisNotice(null);
-    }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [qrisDynamic]);
-
-  function resetFormInputs() {
-    setCustomerName("");
-    setCustomerPhone("");
-    setCustomerNote("");
-    setCashReceived("");
-    
-    // Reset dates to current local time
     const now = new Date();
-    const tzOffset = now.getTimezoneOffset() * 60000;
-    const localNow = new Date(now.getTime() - tzOffset);
-    
-    setReceivedAt(localNow.toISOString().slice(0, 16));
-    
-    const d = new Date(now);
-    d.setDate(d.getDate() + 2);
-    const localDue = new Date(d.getTime() - tzOffset);
-    setDueAt(localDue.toISOString().slice(0, 16));
-    
-    setPaymentMethod("");
-    nextItemIdRef.current = 1;
-    setItems([{ id: "0", serviceName: "", unit: "kg", qty: 1, price: 0 }]);
+    const init = () => {
+      setReceivedAt(toLocalInput(now));
+      setDueAt(toLocalInput(addDays(now, 2)));
+    };
+    init();
+  }, []);
+
+  useEffect(() => {
+    if (showNote) noteRef.current?.focus();
+  }, [showNote]);
+
+  const total = useMemo(
+    () => items.reduce((sum, it) => sum + Math.max(0, it.qty) * Math.max(0, it.price), 0),
+    [items],
+  );
+  const serviceCount = items.filter((it) => it.serviceName).length;
+
+  const dirty =
+    name.trim() !== "" ||
+    phone.trim() !== "" ||
+    note.trim() !== "" ||
+    items.some((it) => it.serviceName !== "");
+
+  useEffect(() => {
+    if (!dirty) return;
+    function onBeforeUnload(e: BeforeUnloadEvent) {
+      e.preventDefault();
+      e.returnValue = "";
+    }
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [dirty]);
+
+  function chipDue(days: number) {
+    if (!receivedAt) return "";
+    return toLocalInput(addDays(new Date(receivedAt), days));
+  }
+
+  function updateItem(id: string, patch: Partial<ItemRow>) {
+    setItems((prev) => prev.map((it) => (it.id === id ? { ...it, ...patch } : it)));
+  }
+
+  function removeItem(id: string) {
+    setItems((prev) => {
+      if (prev.length <= 1) {
+        return prev.map((it) => (it.id === id ? newItem() : it));
+      }
+      return prev.filter((it) => it.id !== id);
+    });
+  }
+
+  function addItem() {
+    const item = newItem();
+    setItems((prev) => [...prev, item]);
+    setOpenSelectId(item.id);
+  }
+
+  function resetForm() {
+    const now = new Date();
+    setName("");
+    setPhone("");
+    setNote("");
+    setShowNote(false);
+    setItems([newItem()]);
+    setOpenSelectId(null);
+    setErrors({});
+    setReceivedAt(toLocalInput(now));
+    setDueAt(toLocalInput(addDays(now, 2)));
+    setConfirmClear(false);
+  }
+
+  function validate(): Record<string, string> {
+    const e: Record<string, string> = {};
+    if (!name.trim()) e.name = "Nama wajib diisi";
+    if (!phone.trim()) e.phone = "No. HP wajib diisi";
+    if (items.filter((it) => it.serviceName && it.qty > 0).length === 0) e.items = "Pilih minimal 1 layanan";
+    if (receivedAt && dueAt && new Date(dueAt).getTime() < new Date(receivedAt).getTime()) {
+      e.due = "Estimasi tidak boleh sebelum waktu masuk";
+    }
+    return e;
+  }
+
+  function focusFirstError(keys: string[]) {
+    const map: Record<string, React.RefObject<HTMLElement | null>> = {
+      name: nameRef,
+      phone: phoneRef,
+      items: itemsRef,
+      due: dueRef,
+    };
+    for (const key of ["name", "phone", "items", "due"]) {
+      if (keys.includes(key)) {
+        const el = map[key]?.current;
+        el?.scrollIntoView({ behavior: "smooth", block: "center" });
+        el?.focus?.();
+        return;
+      }
+    }
   }
 
   async function handleSave() {
-    if (!customerName.trim()) {
-      setSaveError("Nama pelanggan wajib diisi");
-      return;
-    }
-    if (!customerPhone.trim()) {
-      setSaveError("No. HP wajib diisi");
-      return;
-    }
-
-    const validItems = items.filter((it) => it.serviceName.trim() && it.qty > 0);
-    if (validItems.length === 0) {
-      setSaveError("Minimal 1 item layanan wajib diisi");
+    if (saving) return;
+    const e = validate();
+    setErrors(e);
+    const keys = Object.keys(e);
+    if (keys.length > 0) {
+      focusFirstError(keys);
+      show(e[keys[0]], { type: "error" });
       return;
     }
 
-    if (!paymentMethod) {
-      setSaveError("Pilih metode pembayaran");
-      return;
-    }
+    setSaving(true);
+    const validItems = items
+      .filter((it) => it.serviceName && it.qty > 0)
+      .map((it) => ({ serviceName: it.serviceName, unit: it.unit, qty: it.qty, price: it.price }));
 
-    if (paymentMethod === "cash") {
-      const received = toNumber(cashReceived);
-      if (!Number.isFinite(received)) {
-        setSaveError("Uang diterima wajib diisi");
-        return;
-      }
-      if (received < summary.total) {
-        setSaveError("Uang diterima tidak mencukupi total tagihan");
-        return;
-      }
-    }
-
-    setIsSaving(true);
-    setSaveError(null);
-    setSaveSuccess(null);
-
-    const result = await saveTransaction({
-      customer: {
-        name: customerName,
-        phone: customerPhone.trim(),
-        notes: customerNote,
-      },
-      items: validItems.map((it) => ({
-        serviceName: it.serviceName,
-        unit: it.unit,
-        qty: it.qty,
-        price: it.price,
-      })),
+    const res = await saveTransaction({
+      customer: { name: name.trim(), phone, notes: note },
+      items: validItems,
       status: "diterima",
-      paymentMethod: paymentMethod as PaymentMethod,
-      cashReceived:
-        paymentMethod === "cash" && cashReceived.trim() !== ""
-          ? toNumber(cashReceived)
-          : undefined,
+      paymentMethod: "cash",
+      skipPayment: true,
       receivedAt,
       dueAt,
-      total: summary.total,
+      total,
     });
 
-    if (result.success) {
-      setIsSaving(false);
-      if (result.data.qris) {
-        setQrisPaid(false);
-        setQrisNotice(null);
-        setQrisDynamic({
-          orderNo: result.data.orderNo,
-          paymentId: result.data.qris.paymentId,
-          providerRef: result.data.qris.providerRef,
-          qrString: result.data.qris.qrString,
-          imageUrl: result.data.qris.imageUrl,
-          expiresAt: result.data.qris.expiresAt,
-        });
-        setSaveSuccess(`Transaksi ${result.data.orderNo} berhasil dibuat. Menunggu pembayaran QRIS.`);
-        resetFormInputs();
-      } else {
-        resetFormInputs();
-        setSaveSuccess(`Transaksi ${result.data.orderNo} berhasil disimpan!`);
-      }
-    } else {
-      setSaveError(result.error || "Gagal menyimpan transaksi");
-      setIsSaving(false);
+    if (!res.success) {
+      setSaving(false);
+      show(res.error || "Gagal menyimpan transaksi", {
+        type: "error",
+        actionLabel: "Coba lagi",
+        onAction: () => {
+          void handleSave();
+        },
+      });
+      return;
     }
-  }
 
-  if (!mounted) {
-    return (
-      <div className="flex h-[400px] items-center justify-center rounded-2xl border border-zinc-200 bg-white shadow-sm">
-        <div className="text-sm text-zinc-500">Memuat form...</div>
-      </div>
-    );
+    // Keep the loading state until the payment page starts rendering.
+    router.replace(`/transaksi/${res.data.orderId}/bayar?baru=1`);
   }
-
 
   return (
-    <div className="relative pb-24 lg:pb-0">
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
-        <div className="flex flex-col gap-6">
-        {saveError ? (
-          <div className="flex items-start justify-between gap-3 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-600">
-            <div className="flex-1">{saveError}</div>
-            <button
-              type="button"
-              onClick={() => setSaveError(null)}
-              className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-red-600/80 transition hover:bg-red-500/10 hover:text-red-700"
-              aria-label="Tutup"
-            >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  d="M18 6L6 18"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                />
-                <path
-                  d="M6 6L18 18"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </button>
-          </div>
-        ) : null}
+    <div className="flex min-h-full flex-1 flex-col">
+      <PageHeader
+        title="Transaksi Baru"
+        fallbackHref="/kasir"
+        onBack={() => {
+          if (dirty) setConfirmLeave(true);
+          else router.back();
+        }}
+      />
 
-        {saveSuccess ? (
-          <div className="flex items-start justify-between gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700">
-            <div className="flex-1">{saveSuccess}</div>
-            <button
-              type="button"
-              onClick={() => setSaveSuccess(null)}
-              className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-emerald-700/80 transition hover:bg-emerald-500/10 hover:text-emerald-800"
-              aria-label="Tutup"
-            >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  d="M18 6L6 18"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                />
-                <path
-                  d="M6 6L18 18"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </button>
-          </div>
-        ) : null}
-
-        <section className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
-          <div className="flex flex-col gap-4">
-            <div className="flex items-center justify-between gap-4">
-              <h2 className="text-base font-semibold tracking-tight">Pelanggan</h2>
-              <div className="text-xs text-zinc-500">
-                Wajib isi nama dan no. HP
-              </div>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <label className="flex flex-col gap-2">
-                <span className="text-sm font-medium text-zinc-700">Nama</span>
+      <main
+        className="mx-auto w-full max-w-6xl flex-1 px-4 pt-4"
+        style={{ paddingBottom: "calc(112px + env(safe-area-inset-bottom))" }}
+      >
+        <div className="flex flex-col gap-5">
+          <Section title="Pelanggan">
+            <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4">
+              <Field label="Nama" htmlFor="custName" error={errors.name}>
                 <input
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
+                  id="custName"
+                  ref={nameRef}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
                   placeholder="Nama pelanggan"
-                  className="h-11 rounded-xl border border-zinc-200 bg-white px-4 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
-                  required
+                  className={inputClass}
                 />
-              </label>
+              </Field>
 
-              <label className="flex flex-col gap-2">
-                <span className="text-sm font-medium text-zinc-700">No. HP</span>
+              <Field label="No. HP" htmlFor="custPhone" error={errors.phone}>
                 <input
-                  value={customerPhone}
-                  onChange={(e) => setCustomerPhone(e.target.value)}
+                  id="custPhone"
+                  ref={phoneRef}
+                  type="tel"
                   inputMode="tel"
+                  value={formatPhone(phone)}
+                  onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
                   placeholder="08xxxxxxxxxx"
-                  className="h-11 rounded-xl border border-zinc-200 bg-white px-4 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
-                  required
+                  className={`${inputClass} tabular-nums`}
                 />
-              </label>
+              </Field>
+
+              {showNote || note ? (
+                <Field label="Catatan (opsional)" htmlFor="custNote">
+                  <textarea
+                    id="custNote"
+                    ref={noteRef}
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    rows={3}
+                    className="min-h-[88px] w-full rounded-[10px] border border-slate-200 bg-white px-3 py-2.5 text-[15px] text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
+                  />
+                </Field>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setShowNote(true)}
+                  className="inline-flex min-h-11 items-center gap-1 self-start text-sm font-semibold text-indigo-600"
+                >
+                  <Plus className="h-4 w-4" strokeWidth={2.5} />
+                  Tambah catatan
+                </button>
+              )}
             </div>
+          </Section>
 
-            <label className="flex flex-col gap-2">
-              <span className="text-sm font-medium text-zinc-700">Catatan</span>
-              <textarea
-                value={customerNote}
-                onChange={(e) => setCustomerNote(e.target.value)}
-                placeholder="Catatan tambahan (opsional)"
-                className="min-h-[96px] rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
-              />
-            </label>
-          </div>
-        </section>
+          <Section title="Layanan">
+            <div ref={itemsRef} tabIndex={-1} className="flex flex-col gap-2 outline-none">
+              <ol className="flex list-none flex-col gap-2">
+                {items.map((item) => (
+                  <li key={item.id} className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-3.5">
+                    <div className="flex items-center gap-2">
+                      <ServiceSelect
+                        open={openSelectId === item.id}
+                        onOpenChange={(open) => setOpenSelectId(open ? item.id : null)}
+                        services={services}
+                        value={item.serviceId}
+                        onChange={(service) =>
+                          updateItem(item.id, {
+                            serviceId: service.id,
+                            serviceName: service.name,
+                            unit: service.unit,
+                            price: service.base_price,
+                            qty: service.unit === "kg" ? Math.max(0.5, item.qty) : Math.max(1, item.qty),
+                          })
+                        }
+                      />
+                      <button
+                        type="button"
+                        aria-label={`Hapus ${item.serviceName || "layanan"}`}
+                        onClick={() => removeItem(item.id)}
+                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] border border-slate-200 text-slate-500"
+                      >
+                        <Trash2 className="h-5 w-5" strokeWidth={2} />
+                      </button>
+                    </div>
 
-        <section className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
-          <div className="flex items-center justify-between gap-4">
-            <h2 className="text-base font-semibold tracking-tight">
-              Item Layanan
-            </h2>
-            <button
-              type="button"
-              onClick={() =>
-                setItems((prev) => {
-                  const id = String(nextItemIdRef.current++);
-                  return [
-                    ...prev,
-                    { id, serviceName: "", unit: "kg", qty: 1, price: 0 },
-                  ];
-                })
-              }
-              className="inline-flex h-9 items-center justify-center rounded-lg border border-zinc-200 bg-white px-3 text-sm font-medium text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
-            >
-              Tambah Item
-            </button>
-          </div>
-
-          <div className="mt-4">
-            <div className="hidden grid-cols-[1fr_80px_100px_130px_44px] gap-3 border-b border-zinc-100 pb-3 text-xs font-medium text-zinc-500 sm:grid">
-                <div>Layanan</div>
-                <div>Satuan</div>
-                <div>Qty</div>
-                <div>Harga</div>
-                <div />
-            </div>
-
-            <div className="flex flex-col gap-4 pt-3">
-              {items.map((it, idx) => {
-                const lineTotal = summary.lineTotals[idx] ?? 0;
-                return (
-                  <div
-                    key={it.id}
-                    className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm sm:rounded-none sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none"
-                  >
-                    <div className="grid gap-3 sm:grid-cols-[1fr_80px_100px_130px_44px] sm:items-start">
-                      <div className="flex flex-col gap-1 sm:contents">
-                        <span className="text-xs font-medium text-zinc-500 sm:hidden">
-                          Layanan
+                    <div className="flex items-end justify-between gap-3">
+                      <QtyStepper
+                        qty={item.qty}
+                        unit={item.unit}
+                        onChange={(qty) => updateItem(item.id, { qty })}
+                      />
+                      <div className="flex flex-col items-end gap-0.5 text-right">
+                        <span className="text-xs tabular-nums text-slate-500">
+                          × {formatRp(item.price)} / {item.unit}
                         </span>
-                        <select
-                          value={it.serviceName}
-                          onChange={(e) => {
-                            const selectedSvc = dbServices.find(s => s.name === e.target.value);
-                            setItems((prev) =>
-                              prev.map((row) =>
-                                row.id === it.id
-                                  ? { 
-                                      ...row, 
-                                      serviceName: e.target.value,
-                                      unit: (selectedSvc?.unit as Unit) || row.unit,
-                                      price: selectedSvc?.base_price ?? row.price
-                                    }
-                                  : row
-                              )
-                            );
-                          }}
-                          className="h-11 rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
-                        >
-                          <option value="" disabled>
-                            Pilih layanan
-                          </option>
-                          {dbServices.length > 0 ? (
-                            dbServices.map((svc) => (
-                              <option key={svc.id} value={svc.name}>
-                                {svc.name}
-                              </option>
-                            ))
-                          ) : (
-                            <>
-                              <option value="cuci + setrika">Cuci + Setrika</option>
-                              <option value="cuci kering saja">Cuci Kering Saja</option>
-                              <option value="setrika saja">Setrika Saja</option>
-                              <option value="bed cover">Bed Cover</option>
-                            </>
-                          )}
-                        </select>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3 sm:contents">
-                        <div className="flex flex-col gap-1 sm:contents">
-                          <span className="text-xs font-medium text-zinc-500 sm:hidden">
-                            Satuan
-                          </span>
-                          <select
-                            value={it.unit}
-                            disabled
-                            className="h-11 rounded-xl border border-zinc-200 bg-zinc-50 px-3 text-sm text-zinc-500 outline-none appearance-none"
-                          >
-                            <option value="kg">Kg</option>
-                            <option value="pcs">Pcs</option>
-                          </select>
-                        </div>
-
-                        <div className="flex flex-col gap-1 sm:contents">
-                          <span className="text-xs font-medium text-zinc-500 sm:hidden">
-                            Qty
-                          </span>
-                          <div className="flex flex-col gap-1">
-                            <input
-                              value={String(it.qty)}
-                              onChange={(e) =>
-                                setItems((prev) =>
-                                  prev.map((row) =>
-                                    row.id === it.id
-                                      ? { ...row, qty: toNumber(e.target.value) }
-                                      : row
-                                  )
-                                )
-                              }
-                              inputMode="decimal"
-                              className="h-11 rounded-xl border border-zinc-200 bg-white px-4 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
-                            />
-                            <div className="text-xs text-zinc-500">
-                              Subtotal: {formatIDR(lineTotal)}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-col gap-1 sm:contents">
-                        <span className="text-xs font-medium text-zinc-500 sm:hidden">
-                          Harga
+                        <span className="text-[15px] font-bold tabular-nums text-slate-900">
+                          {formatRp(item.qty * item.price)}
                         </span>
-                        <input
-                          value={String(it.price)}
-                          readOnly
-                          tabIndex={-1}
-                          inputMode="numeric"
-                          placeholder="0"
-                          className="h-11 rounded-xl border border-zinc-200 bg-zinc-50 px-4 text-sm text-zinc-500 outline-none"
-                        />
-                      </div>
-
-                      <div className="flex items-end justify-end sm:items-center sm:justify-center">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setItems((prev) =>
-                              prev.length <= 1
-                                ? prev
-                                : prev.filter((row) => row.id !== it.id)
-                            )
-                          }
-                          className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-zinc-200 text-zinc-600 transition hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
-                          aria-label="Hapus item"
-                          title="Hapus"
-                          disabled={items.length <= 1}
-                        >
-                          <svg
-                            width="18"
-                            height="18"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            xmlns="http://www.w3.org/2000/svg"
-                          >
-                            <path
-                              d="M6 7H18"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                            />
-                            <path
-                              d="M10 11V17"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                            />
-                            <path
-                              d="M14 11V17"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                            />
-                            <path
-                              d="M9 7L10 5H14L15 7"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            />
-                            <path
-                              d="M7 7L8 20H16L17 7"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            />
-                          </svg>
-                        </button>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </section>
-      </div>
-
-      <aside className="flex flex-col gap-6">
-        <section className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
-          <h2 className="text-base font-semibold tracking-tight">Ringkasan</h2>
-
-          <div className="mt-4 flex flex-col gap-3 text-sm">
-            <div className="flex flex-col gap-2">
-              <span className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Layanan Terpilih</span>
-              <div className="flex flex-col gap-1.5">
-                {items.some((it) => it.serviceName.trim()) ? (
-                  items.map((it, idx) => {
-                    if (!it.serviceName.trim()) return null;
-                    const lineTotal = summary.lineTotals[idx] ?? 0;
-                    return (
-                      <div key={it.id} className="flex items-start justify-between gap-3">
-                        <span className="min-w-0 truncate text-zinc-700">{it.serviceName}</span>
-                        <div className="shrink-0 text-right">
-                          <div className="text-xs font-medium text-zinc-500">
-                            {it.qty} {it.unit}
-                          </div>
-                          <div className="font-medium text-zinc-900">{formatIDR(lineTotal)}</div>
-                        </div>
-                      </div>
-                    );
-                  })
-                ) : (
-                  <span className="text-zinc-400 italic text-xs">Belum ada layanan</span>
-                )}
-              </div>
-            </div>
-            
-            <div className="flex items-center justify-between gap-4 border-t border-zinc-100 pt-3">
-              <span className="text-zinc-600 font-medium">Total</span>
-              <span className="text-base font-semibold tracking-tight text-indigo-600">
-                {formatIDR(summary.total)}
-              </span>
-            </div>
-          </div>
-
-          <div className="mt-5 grid gap-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <label className="flex flex-col gap-2">
-                <span className="text-sm font-medium text-zinc-700">
-                  Tanggal Masuk
-                </span>
-                <input
-                  type="datetime-local"
-                  value={receivedAt}
-                  readOnly
-                  disabled
-                  className="h-11 rounded-xl border border-zinc-200 bg-zinc-50 px-3 text-sm text-zinc-500 outline-none cursor-not-allowed"
-                />
-              </label>
-
-              <label className="flex flex-col gap-2">
-                <span className="text-sm font-medium text-zinc-700">
-                  Estimasi Selesai
-                </span>
-                <input
-                  type="datetime-local"
-                  value={dueAt}
-                  onChange={(e) => setDueAt(e.target.value)}
-                  className="h-11 rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
-                />
-              </label>
-            </div>
-
-            <label className="flex flex-col gap-2">
-              <span className="text-sm font-medium text-zinc-700">
-                Pembayaran
-              </span>
-              <select
-                value={paymentMethod}
-                onChange={(e) => {
-                  const raw = e.target.value;
-                  if (!raw) {
-                    setPaymentMethod("");
-                    return;
-                  }
-                  const next = raw as PaymentMethod;
-                  setPaymentMethod(next);
-                  if (next === "cash" && cashReceived.trim() === "") setCashReceived(String(summary.total));
-                }}
-                className="h-11 rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
-              >
-                <option value="" disabled hidden>
-                  Pilih metode pembayaran
-                </option>
-                {paymentOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
+                  </li>
                 ))}
-              </select>
-            </label>
+              </ol>
 
-            {paymentMethod === "cash" ? (
-              <label className="flex flex-col gap-2">
-                <span className="text-sm font-medium text-zinc-700">
-                  Uang Diterima
-                </span>
-                <input
-                  type="number"
-                  value={cashReceived}
-                  onChange={(e) => setCashReceived(e.target.value)}
-                  inputMode="numeric"
-                  placeholder={String(summary.total)}
-                  className="h-11 rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
-                />
-                <span className="text-xs text-zinc-500">
-                  Kembalian: {formatIDR(toNumber(cashReceived) - summary.total)}
-                </span>
-              </label>
-            ) : null}
-          </div>
+              {errors.items ? <p className="mx-1 text-xs text-red-600">{errors.items}</p> : null}
 
-          <div className="mt-6 flex flex-col gap-3">
-            <button
-              type="button"
-              disabled={!canSubmit || isSaving}
-              onClick={handleSave}
-              className="inline-flex h-11 items-center justify-center rounded-xl bg-indigo-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
-            >
-              {isSaving
-                ? "Memproses..."
-                : paymentMethod === "cash" || paymentMethod === "qris_dynamic"
-                  ? "Bayar"
-                  : "Simpan Transaksi"}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                resetFormInputs();
-              }}
-              className="inline-flex h-11 items-center justify-center rounded-xl border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
-            >
-              Reset
-            </button>
-          </div>
-        </section>
-      </aside>
-      </div>
-
-      <div
-        className="fixed inset-x-0 bottom-0 z-30 lg:hidden"
-        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
-      >
-        <div className="mx-auto w-full max-w-6xl px-3 pb-2 sm:px-4">
-          <div className="flex items-center justify-between rounded-2xl border border-zinc-200 bg-white/95 px-4 py-3 shadow-sm backdrop-blur">
-            <div className="flex flex-col">
-              <div className="text-xs font-medium text-zinc-500">Total</div>
-              <div className="text-base font-semibold tracking-tight text-indigo-600">
-                {formatIDR(summary.total)}
-              </div>
-            </div>
-            <div className="text-xs text-zinc-500">{summary.itemCount} item</div>
-          </div>
-        </div>
-      </div>
-
-      {qrisDynamic ? (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4"
-          onMouseDown={(e) => {
-            if (e.target === e.currentTarget) {
-              setQrisDynamic(null);
-              setQrisNotice(null);
-            }
-          }}
-        >
-          <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white shadow-xl">
-            <div className="flex flex-col gap-1 border-b border-zinc-100 p-5 text-center">
-                <div className="text-sm font-semibold text-zinc-900">QRIS</div>
-                <div className="text-xs text-zinc-500">{qrisDynamic.orderNo}</div>
-            </div>
-
-            <div className="flex flex-col gap-4 p-5">
-              <div className="flex flex-col items-center gap-3 text-center">
-                <div className="rounded-2xl border border-zinc-200 bg-white p-3">
-                  <QRCodeCanvas value={qrisDynamic.qrString} size={240} />
-                </div>
-                <div
-                  className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                    qrisPaid ? "bg-emerald-500/10 text-emerald-700" : "bg-amber-500/10 text-amber-700"
-                  }`}
-                >
-                  {qrisPaid ? "Lunas" : "Menunggu Pembayaran"}
-                </div>
-                {qrisCountdown ? (
-                  <div className={`text-xs ${qrisCountdown.remainingMs <= 0 && !qrisPaid ? "font-semibold text-red-600" : "text-zinc-500"}`}>
-                    {qrisCountdown.remainingMs <= 0 ? "QRIS kedaluwarsa" : `Kedaluwarsa dalam ${qrisCountdown.timeLeft}`}
-                  </div>
-                ) : null}
-
-                {qrisNotice ? (
-                  <div
-                    className={`w-full rounded-xl border px-3 py-2 text-center text-xs ${
-                      qrisNotice.type === "success"
-                        ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700"
-                        : qrisNotice.type === "error"
-                          ? "border-red-500/30 bg-red-500/10 text-red-700"
-                          : "border-amber-500/30 bg-amber-500/10 text-amber-700"
-                    }`}
-                  >
-                    {qrisNotice.message}
-                  </div>
-                ) : null}
-              </div>
-
-              {showQrisDebug && simulatorImageUrl ? (
-                <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
-                  <div className="text-xs font-medium text-zinc-600">QR Code Image URL (Sandbox Simulator)</div>
-                  <div className="mt-2 flex items-center gap-2">
-                    <input
-                      value={simulatorImageUrl}
-                      readOnly
-                      className="h-10 w-full rounded-xl border border-zinc-200 bg-white px-3 text-xs text-zinc-700 outline-none"
-                    />
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        try {
-                          const url = simulatorImageUrl;
-                          if (!url) return;
-                          await navigator.clipboard.writeText(url);
-                        } catch {}
-                      }}
-                      className="inline-flex h-10 shrink-0 items-center justify-center rounded-xl border border-zinc-200 bg-white px-3 text-xs font-semibold text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
-                    >
-                      Copy
-                    </button>
-                  </div>
-                </div>
-              ) : null}
               <button
                 type="button"
-                disabled={checkingQris || qrisPaid}
-                onClick={async () => {
-                  if (!qrisDynamic) return;
-                  setCheckingQris(true);
-                  setSaveError(null);
-                  setSaveSuccess(null);
-                  setQrisNotice(null);
-                  try {
-                    const httpRes = await fetch(`/api/qris/${qrisDynamic.paymentId}/status`, {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      cache: "no-store",
-                    });
-                    const res = (await httpRes.json()) as
-                      | { success: true; data: { status: string; providerStatus: string | null } }
-                      | { success: false; error: string };
-
-                    if (res.success) {
-                      if (res.data.status === "paid") {
-                        setQrisPaid(true);
-                        setQrisNotice({ type: "success", message: "Pembayaran QRIS berhasil (lunas)." });
-                      } else if (res.data.status === "pending") {
-                        setQrisNotice({ type: "info", message: "Pembayaran belum diterima. Silakan scan ulang." });
-                      } else if (res.data.status === "expired") {
-                        setQrisNotice({ type: "error", message: "QRIS sudah kedaluwarsa." });
-                      } else if (res.data.status === "failed") {
-                        setQrisNotice({ type: "error", message: "Pembayaran gagal/ditolak." });
-                      } else {
-                        setQrisNotice({ type: "info", message: `Status: ${res.data.status}` });
-                      }
-                    } else {
-                      setQrisNotice({ type: "error", message: res.error || "Gagal cek status pembayaran." });
-                    }
-                  } finally {
-                    setCheckingQris(false);
-                  }
-                }}
-                className="inline-flex h-10 w-full items-center justify-center rounded-xl bg-indigo-600 px-4 text-xs font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                onClick={addItem}
+                className="flex min-h-12 w-full items-center justify-center gap-1.5 rounded-[14px] border-[1.5px] border-dashed border-slate-300 bg-transparent text-sm font-semibold text-indigo-600"
               >
-                {qrisPaid ? "Sudah Dibayar" : checkingQris ? "Mengecek..." : "Cek Status Pembayaran"}
+                <Plus className="h-4 w-4" strokeWidth={2.5} />
+                Tambah layanan
               </button>
+            </div>
+          </Section>
 
-              <div className="text-center text-xs text-zinc-500">
-                Scan QR menggunakan aplikasi e-wallet atau mobile banking yang mendukung QRIS.
+          <Section title="Waktu">
+            <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-slate-500">Masuk</span>
+                <span className="text-sm font-semibold tabular-nums text-slate-900">{formatDisplay(receivedAt)}</span>
+              </div>
+
+              <div className="border-t border-slate-200 pt-4">
+                <fieldset className="m-0 min-w-0 border-0 p-0">
+                  <legend className="mb-2.5 border-0 p-0 text-sm font-medium text-slate-900">Estimasi selesai</legend>
+
+                  <div className="flex flex-wrap gap-2">
+                    {[1, 2, 3].map((n) => {
+                      const active = dueAt !== "" && dueAt === chipDue(n);
+                      return (
+                        <button
+                          key={n}
+                          type="button"
+                          aria-pressed={active}
+                          onClick={() => setDueAt(chipDue(n))}
+                          className={`inline-flex min-h-10 items-center gap-1.5 rounded-full px-3.5 text-sm transition-colors ${
+                            active
+                              ? "border border-indigo-600 bg-indigo-50 font-semibold text-indigo-600"
+                              : "border border-slate-200 bg-white font-medium text-slate-600"
+                          }`}
+                        >
+                          {active ? <Check className="h-3.5 w-3.5" strokeWidth={2.5} /> : null}
+                          {n} hari
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="relative mt-3 flex h-11 items-center justify-between rounded-[10px] border border-slate-200 bg-white px-3">
+                    <span className="text-[15px] tabular-nums text-slate-900">{formatDisplay(dueAt)}</span>
+                    <CalendarDays className="h-4 w-4 text-slate-400" strokeWidth={2} />
+                    <input
+                      ref={dueRef}
+                      type="datetime-local"
+                      value={dueAt}
+                      onChange={(e) => setDueAt(e.target.value)}
+                      aria-label="Estimasi selesai"
+                      className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                    />
+                  </div>
+                  {errors.due ? <p className="mt-1.5 text-xs text-red-600">{errors.due}</p> : null}
+                </fieldset>
               </div>
             </div>
+          </Section>
 
+          <button
+            type="button"
+            onClick={() => (dirty ? setConfirmClear(true) : resetForm())}
+            className="mx-auto inline-flex min-h-11 items-center text-sm font-medium text-slate-500 underline"
+          >
+            Kosongkan form
+          </button>
+        </div>
+      </main>
+
+      {!keyboardOpen ? (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white">
+          <div
+            className="mx-auto flex w-full max-w-6xl items-center gap-3 px-4 pt-3"
+            style={{ paddingBottom: "calc(16px + env(safe-area-inset-bottom))" }}
+          >
+            <div className="flex min-w-0 flex-1 flex-col">
+              <span className="truncate text-xs text-slate-500">Total · {serviceCount} layanan</span>
+              <span className="whitespace-nowrap font-display text-[20px] font-bold tabular-nums text-slate-900">
+                {formatRp(total)}
+              </span>
+            </div>
+            <Button size="lg" onClick={handleSave} loading={saving} loadingText="Menyimpan…">
+              Simpan transaksi
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
+      {confirmClear ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div role="dialog" aria-modal="true" className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
+            <h2 className="text-base font-semibold text-slate-900">Kosongkan semua isian?</h2>
+            <div className="mt-5 flex flex-col gap-2">
+              <Button onClick={resetForm}>Kosongkan</Button>
+              <Button variant="outline" onClick={() => setConfirmClear(false)}>
+                Batal
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {confirmLeave ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div role="dialog" aria-modal="true" className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
+            <h2 className="text-base font-semibold text-slate-900">Batalkan transaksi ini?</h2>
+            <p className="mt-1 text-sm text-slate-500">Isian akan hilang.</p>
+            <div className="mt-5 flex flex-col gap-2">
+              <Button
+                onClick={() => {
+                  setConfirmLeave(false);
+                  router.back();
+                }}
+              >
+                Batalkan
+              </Button>
+              <Button variant="outline" onClick={() => setConfirmLeave(false)}>
+                Lanjut isi
+              </Button>
+            </div>
           </div>
         </div>
       ) : null}

@@ -22,30 +22,29 @@ export type TransactionData = {
   }>;
   status: string;
   paymentMethod: "cash" | "transfer" | "qris_manual" | "qris_dynamic";
+  payLater?: boolean;
+  skipPayment?: boolean;
   cashReceived?: number;
   receivedAt: string;
   dueAt: string;
   total: number;
 };
 
+export type SaveTransactionResult = {
+  orderNo: string;
+  orderId: string;
+  qris?: {
+    paymentId: string;
+    providerRef: string;
+    qrString: string;
+    imageUrl: string | null;
+    expiresAt: string | null;
+  };
+};
+
 export async function saveTransaction(
   data: TransactionData,
-): Promise<
-  ActionResponse<
-    { orderNo: string } & (
-      | { qris?: undefined }
-      | {
-          qris: {
-            paymentId: string;
-          providerRef: string;
-            qrString: string;
-          imageUrl: string | null;
-            expiresAt: string | null;
-          };
-        }
-    )
-  >
-> {
+): Promise<ActionResponse<SaveTransactionResult>> {
   const supabase = await createClient();
 
   // 1. Dapatkan user ID pembuat
@@ -119,7 +118,7 @@ export async function saveTransaction(
       }
     }
 
-    if (data.paymentMethod === "cash") {
+    if (!data.skipPayment && data.paymentMethod === "cash" && !data.payLater) {
       if (typeof data.cashReceived !== "number" || data.cashReceived < computedTotal) {
         return actionError("Uang diterima tidak mencukupi total tagihan");
       }
@@ -198,14 +197,21 @@ export async function saveTransaction(
       return actionError(itemsError.message || "Gagal menyimpan item transaksi");
     }
 
+    // Two-step flow: save the order first without any payment row ("Belum bayar").
+    if (data.skipPayment) {
+      try {
+        revalidatePath("/kasir/riwayat");
+      } catch {}
+      return actionSuccess({ orderNo, orderId: createdOrderId });
+    }
+
     // 6. Insert Payment
+    const isCashPaidNow = data.paymentMethod === "cash" && !data.payLater;
     const cashReceived =
-      data.paymentMethod === "cash" && typeof data.cashReceived === "number"
-        ? data.cashReceived
-        : null;
+      isCashPaidNow && typeof data.cashReceived === "number" ? data.cashReceived : null;
     const change = cashReceived !== null ? cashReceived - computedTotal : null;
     const paymentNotes =
-      data.paymentMethod === "cash" && (cashReceived !== null || change !== null)
+      isCashPaidNow && (cashReceived !== null || change !== null)
         ? [cashReceived !== null ? `cash_received=${cashReceived}` : null, change !== null ? `change=${change}` : null]
             .filter(Boolean)
             .join(" | ")
@@ -216,10 +222,10 @@ export async function saveTransaction(
       .insert({
         order_id: createdOrderId,
         cash_register_id: shiftId,
-        paid_at: data.paymentMethod === "cash" ? new Date().toISOString() : null,
+        paid_at: isCashPaidNow ? new Date().toISOString() : null,
         amount: computedTotal,
         method: data.paymentMethod,
-        status: data.paymentMethod === "cash" ? "paid" : "pending",
+        status: isCashPaidNow ? "paid" : "pending",
         received_by: user.id,
         notes: paymentNotes,
       })
@@ -270,6 +276,7 @@ export async function saveTransaction(
 
       return actionSuccess({
         orderNo,
+        orderId: createdOrderId,
         qris: {
           paymentId: createdPayment.id,
           providerRef: created.providerRef,
@@ -284,7 +291,7 @@ export async function saveTransaction(
       revalidatePath("/kasir/riwayat");
     } catch {}
     
-    return actionSuccess({ orderNo });
+    return actionSuccess({ orderNo, orderId: createdOrderId });
   } catch (err) {
     console.error("Save transaction error:", err);
     if (orderId) {

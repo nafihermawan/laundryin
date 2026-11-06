@@ -1,5 +1,5 @@
 import { HomeHeader } from "@/components/app/home-header";
-import { KasirBottomNav } from "@/components/app/kasir-bottom-nav";
+import { BottomNav } from "@/components/app/bottom-nav";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function Loading() {
@@ -50,7 +50,7 @@ export default function Loading() {
           </div>
         </div>
       </main>
-      <KasirBottomNav hasActiveShift />
+      <BottomNav role="cashier" hasActiveShift />
     </div>
   );
 }

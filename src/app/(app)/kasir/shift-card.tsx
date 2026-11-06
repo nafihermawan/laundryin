@@ -10,8 +10,15 @@ import { useToast } from "@/components/ui/toast";
 
 import { closeShift, openShift } from "./shift/actions";
 
+export const DEFAULT_KAS_AWAL = 50000;
+
 function formatIDR(amount: number) {
   return `Rp ${new Intl.NumberFormat("id-ID").format(Math.round(amount))}`;
+}
+
+function formatThousands(digits: string) {
+  if (!digits) return "";
+  return new Intl.NumberFormat("id-ID").format(Number(digits));
 }
 
 function formatJam(iso: string) {
@@ -49,7 +56,7 @@ export function ShiftCard({
   const variance = cashNum - expectedCash;
 
   function openDialog(kind: "open" | "close") {
-    setCashInput("");
+    setCashInput(kind === "open" ? String(DEFAULT_KAS_AWAL) : "");
     setNotes("");
     setError(null);
     setDialog(kind);
@@ -57,6 +64,10 @@ export function ShiftCard({
 
   async function submit() {
     setError(null);
+    if (cashInput.trim() === "") {
+      setError(dialog === "open" ? "Isi kas awal (boleh 0)" : "Isi uang fisik di laci");
+      return;
+    }
     const value = Number(cashInput);
     if (!Number.isFinite(value) || value < 0) {
       setError("Nominal uang tidak valid");
@@ -78,7 +89,7 @@ export function ShiftCard({
     }
 
     setDialog(null);
-    show(dialog === "open" ? "Shift kasir dibuka" : "Shift kasir ditutup");
+    show(dialog === "open" ? "Shift dibuka" : "Shift ditutup");
     router.refresh();
   }
 
@@ -160,7 +171,7 @@ export function ShiftCard({
 
             <div className="mt-4 flex flex-col gap-4">
               <Field
-                label={dialog === "open" ? "Modal Awal (Starting Cash)" : "Uang Fisik di Laci (Actual)"}
+                label={dialog === "open" ? "Kas awal" : "Uang Fisik di Laci (Actual)"}
                 htmlFor="shiftCash"
                 error={error ?? undefined}
               >
@@ -170,12 +181,14 @@ export function ShiftCard({
                   </span>
                   <input
                     id="shiftCash"
-                    type="number"
-                    min="0"
+                    type="text"
                     inputMode="numeric"
-                    value={cashInput}
-                    onChange={(e) => setCashInput(e.target.value)}
+                    pattern="[0-9]*"
+                    value={formatThousands(cashInput)}
+                    onChange={(e) => setCashInput(e.target.value.replace(/\D/g, ""))}
+                    onFocus={(e) => e.currentTarget.select()}
                     placeholder="0"
+                    disabled={submitting}
                     className={`${inputClass} pl-10`}
                   />
                 </div>
@@ -205,6 +218,7 @@ export function ShiftCard({
                       onChange={(e) => setNotes(e.target.value)}
                       rows={2}
                       placeholder={variance !== 0 ? "Jelaskan alasan selisih uang..." : "Catatan tambahan..."}
+                      disabled={submitting}
                       className="w-full rounded-[10px] border border-slate-200 bg-white px-3 py-2.5 text-[15px] text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
                     />
                   </Field>

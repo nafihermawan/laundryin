@@ -1,4 +1,4 @@
-import { Check, Phone } from "lucide-react";
+import { AlertTriangle, Check, Phone } from "lucide-react";
 
 import { CopyUrl } from "@/components/copy-url";
 import { PageHeader } from "@/components/app/page-header";
@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 
 import { DetailBottomBar } from "./detail-bottom-bar";
 import { CopyOrderButton } from "./copy-order-button";
+import { InvoiceCard } from "./invoice-card";
 import { LogAccordion } from "./log-accordion";
 import { StatusAccordion, type StatusStep } from "./status-accordion";
 
@@ -65,6 +66,23 @@ function paymentStatusPill(status: string) {
   if (status === "expired") return { label: "Kedaluwarsa", classes: "bg-slate-100 text-slate-600" };
   if (status === "failed") return { label: "Gagal", classes: "bg-slate-100 text-slate-600" };
   return { label: status, classes: "bg-slate-100 text-slate-600" };
+}
+
+function translateGatewayStatus(value: string) {
+  switch (value) {
+    case "expire":
+      return "kedaluwarsa";
+    case "pending":
+      return "menunggu";
+    case "settlement":
+      return "berhasil";
+    case "cancel":
+      return "dibatalkan";
+    case "deny":
+      return "ditolak";
+    default:
+      return value;
+  }
 }
 
 function parsePaymentNotes(notes: string | null | undefined) {
@@ -202,6 +220,13 @@ export default async function TransactionDetailPage({
 
   const status = getLaundryStatus(order.status);
   const isPaid = payments.some((p) => p.status === "paid");
+  const hasDuplicatePayment = payments.some((p) =>
+    (p.notes ?? "").includes("duplicate_payment=refund_needed"),
+  );
+  const lastQrisAttempt =
+    payments
+      .filter((p) => p.method === "qris_dynamic")
+      .sort((a, b) => String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")))[0] ?? null;
   const orderMeta = order as unknown as { ready_at?: string | null; updated_at?: string | null };
 
   const readyEventTs =
@@ -319,6 +344,36 @@ export default async function TransactionDetailPage({
             </div>
           </section>
 
+          {!isPaid ? (
+            <InvoiceCard
+              orderId={order.id}
+              total={total}
+              lastAttempt={
+                lastQrisAttempt
+                  ? {
+                      paymentId: lastQrisAttempt.id,
+                      status: lastQrisAttempt.status,
+                      expiresAt: lastQrisAttempt.qris_expires_at ?? null,
+                    }
+                  : null
+              }
+            />
+          ) : null}
+
+          {hasDuplicatePayment ? (
+            <div role="alert" className="rounded-2xl border border-amber-200 bg-orange-50 p-4">
+              <div className="flex items-start gap-2.5">
+                <AlertTriangle className="h-5 w-5 shrink-0 text-amber-600" strokeWidth={2} />
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-sm font-semibold text-amber-800">Pembayaran ganda – perlu refund</span>
+                  <span className="text-[13px] text-amber-700">
+                    Ada lebih dari satu pembayaran QRIS yang berhasil untuk transaksi ini. Perlu pengecekan/refund manual.
+                  </span>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
           {/* Status cucian */}
           <Section title="Status cucian">
             <StatusAccordion
@@ -405,7 +460,7 @@ export default async function TransactionDetailPage({
                   const cashChange = meta.change ? Number(meta.change) : null;
                   const methodChangedFrom = meta.method_changed_from ?? null;
                   const providerStatusText =
-                    isExpiredByTime && p.provider_status === "pending" ? "expired" : p.provider_status ?? null;
+                    isExpiredByTime && p.provider_status === "pending" ? "expire" : p.provider_status ?? null;
 
                   return (
                     <li key={p.id} className="rounded-xl border border-slate-200 p-3.5">
@@ -424,7 +479,7 @@ export default async function TransactionDetailPage({
                         <div className="flex flex-col gap-1 text-[13px] text-slate-500">
                           <span className="tabular-nums">
                             {timestamp ? formatDateTime(timestamp) : "-"}
-                            {providerStatusText ? ` · ${providerStatusText}` : ""}
+                            {providerStatusText ? ` · ${translateGatewayStatus(providerStatusText)}` : ""}
                           </span>
                           {methodChangedFrom ? (
                             <span>
@@ -435,7 +490,7 @@ export default async function TransactionDetailPage({
                           {p.reference_no ? <span className="break-all">Ref: {p.reference_no}</span> : null}
                         </div>
 
-                        {p.method === "qris_dynamic" && p.provider_ref ? (
+                        {p.method === "qris_dynamic" && p.provider_ref && effectiveStatus === "pending" ? (
                           <div className="rounded-[10px] border border-slate-200 bg-white p-3">
                             <div className="text-[11px] font-semibold text-slate-600">Midtrans QR URL</div>
                             <div className="mt-2">
@@ -473,7 +528,6 @@ export default async function TransactionDetailPage({
         customerName={customerName}
         status={status}
         isPaid={isPaid}
-        total={total}
       />
       <ScrollCue barHeight={76} />
     </div>
