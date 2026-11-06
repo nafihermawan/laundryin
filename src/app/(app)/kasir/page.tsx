@@ -1,4 +1,6 @@
 import Link from "next/link";
+
+import { PageShell } from "@/components/app/page-shell";
 import { createClient } from "@/lib/supabase/server";
 import { getActiveCashRegister } from "@/lib/auth/cash-register";
 
@@ -49,14 +51,8 @@ export default async function KasirPage() {
   ] as const;
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Kasir</h1>
-        <p className="text-sm text-zinc-600">
-          Pilih aksi untuk melayani pelanggan dengan cepat.
-        </p>
-      </div>
-
+    <PageShell title="Kasir">
+      <div className="flex flex-col gap-6">
       {!shiftStatus.isOpen && (
         <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 shadow-sm">
           <div className="flex items-center justify-between">
@@ -222,6 +218,7 @@ export default async function KasirPage() {
           </div>
         </Link>
       </div>
-    </div>
+      </div>
+    </PageShell>
   );
 }

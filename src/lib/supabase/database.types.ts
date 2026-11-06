@@ -277,6 +277,7 @@ export interface Database {
           created_at: string;
           full_name: string | null;
           id: string;
+          is_active: boolean;
           phone: string | null;
           role: string;
         };
@@ -284,6 +285,7 @@ export interface Database {
           created_at?: string;
           full_name?: string | null;
           id: string;
+          is_active?: boolean;
           phone?: string | null;
           role?: string;
         };
@@ -291,6 +293,7 @@ export interface Database {
           created_at?: string;
           full_name?: string | null;
           id?: string;
+          is_active?: boolean;
           phone?: string | null;
           role?: string;
         };

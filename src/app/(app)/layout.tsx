@@ -1,10 +1,7 @@
 import { redirect } from "next/navigation";
-import Image from "next/image";
 
-import { getUserRole } from "@/lib/auth/get-user-role";
+import { ToastProvider } from "@/components/ui/toast";
 import { createClient } from "@/lib/supabase/server";
-
-import { BottomNavShell } from "./bottom-nav-shell";
 
 export default async function AppLayout({
   children,
@@ -18,38 +15,20 @@ export default async function AppLayout({
 
   if (!user) redirect("/login");
 
-  const role = await getUserRole(supabase, user.id);
   const { data: profile } = await supabase
     .from("profiles")
-    .select("full_name")
+    .select("is_active")
     .eq("id", user.id)
     .maybeSingle();
-  const displayName = profile?.full_name?.trim() || user.email || "User";
+
+  if (profile?.is_active === false) {
+    await supabase.auth.signOut();
+    redirect("/login?error=inactive");
+  }
 
   return (
-    <div className="flex min-h-full flex-1 flex-col bg-zinc-50 text-zinc-950">
-      <header className="border-b border-zinc-200 bg-white">
-        <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between px-4">
-          <a
-            href={role === "admin" ? "/admin" : "/kasir"}
-            className="inline-flex items-center gap-2 font-semibold tracking-tight text-zinc-900"
-            aria-label="Home"
-          >
-             <Image src="/icon.svg" alt="laundry.in" width={24} height={24} priority />
-            <span>laundry.in</span>
-          </a>
-
-          <div className="text-right">
-            <div className="text-sm font-medium text-zinc-900">
-              {displayName}
-            </div>
-          </div>
-        </div>
-      </header>
-      <main className="mx-auto w-full max-w-6xl flex-1 px-3 py-6 pb-24 sm:px-4">
-        {children}
-      </main>
-      <BottomNavShell homeHref={role === "admin" ? "/admin" : "/kasir"} />
-    </div>
+    <ToastProvider>
+      <div className="flex min-h-full flex-1 flex-col bg-slate-50 text-slate-900">{children}</div>
+    </ToastProvider>
   );
 }

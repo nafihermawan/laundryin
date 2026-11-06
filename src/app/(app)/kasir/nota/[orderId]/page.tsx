@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 
+import { PageShell } from "@/components/app/page-shell";
 import { createClient } from "@/lib/supabase/server";
 
 import { PrintButton } from "./print-button";
@@ -83,16 +84,11 @@ export default async function NotaPage({
     | null;
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold tracking-tight">Nota</h1>
-          <p className="text-sm text-zinc-600">{order.order_no}</p>
-        </div>
-        <div className="flex items-center gap-2">
+    <PageShell title="Nota">
+      <div className="flex flex-col gap-6">
+        <div className="flex items-center justify-end print:hidden">
           <PrintButton />
         </div>
-      </div>
 
       <div className="mx-auto w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm print:border-0 print:shadow-none">
         <div className="flex flex-col items-center gap-1">
@@ -180,6 +176,7 @@ export default async function NotaPage({
           Terima kasih.
         </div>
       </div>
-    </div>
+      </div>
+    </PageShell>
   );
 }

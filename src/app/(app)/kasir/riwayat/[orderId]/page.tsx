@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { PageShell } from "@/components/app/page-shell";
 import { createClient } from "@/lib/supabase/server";
 import { env } from "@/lib/env";
 import { CopyUrl } from "@/components/copy-url";
@@ -150,41 +151,17 @@ export default async function TransactionDetailPage({
 
   if (error) {
     return (
-      <div className="flex flex-col gap-6">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex flex-col gap-1">
-            <h1 className="text-2xl font-semibold tracking-tight">Detail Transaksi</h1>
-            <div className="text-sm text-zinc-600">Gagal memuat transaksi.</div>
-          </div>
-          <Link
-            href="/kasir/riwayat"
-            className="inline-flex h-10 items-center justify-center rounded-xl border border-zinc-200 bg-white px-3 text-sm font-semibold text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
-          >
-            Kembali
-          </Link>
-        </div>
+      <PageShell title="Detail Transaksi">
         <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-700">
           {error.message}
         </div>
-      </div>
+      </PageShell>
     );
   }
 
   if (!order) {
     return (
-      <div className="flex flex-col gap-6">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex flex-col gap-1">
-            <h1 className="text-2xl font-semibold tracking-tight">Detail Transaksi</h1>
-            <div className="text-sm text-zinc-600">Transaksi tidak ditemukan.</div>
-          </div>
-          <Link
-            href="/kasir/riwayat"
-            className="inline-flex h-10 items-center justify-center rounded-xl border border-zinc-200 bg-white px-3 text-sm font-semibold text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
-          >
-            Kembali
-          </Link>
-        </div>
+      <PageShell title="Detail Transaksi">
         <div className="rounded-2xl border border-zinc-200 bg-white p-4 text-sm text-zinc-700 shadow-sm">
           {user ? (
             <div>Order ID/No: {orderKey}</div>
@@ -192,7 +169,7 @@ export default async function TransactionDetailPage({
             <div>Silakan login ulang lalu coba lagi.</div>
           )}
         </div>
-      </div>
+      </PageShell>
     );
   }
 
@@ -240,27 +217,16 @@ export default async function TransactionDetailPage({
     | null;
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold tracking-tight">Detail Transaksi</h1>
-          <div className="text-sm text-zinc-600">{order.order_no}</div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Link
-            href="/kasir/riwayat"
-            className="inline-flex h-10 items-center justify-center rounded-xl border border-zinc-200 bg-white px-3 text-sm font-semibold text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
-          >
-            Kembali
-          </Link>
+    <PageShell title="Detail Transaksi">
+      <div className="flex flex-col gap-6">
+        <div className="flex items-center justify-end">
           <Link
             href={`/kasir/nota/${order.id}`}
-            className="inline-flex h-10 items-center justify-center rounded-xl bg-zinc-900 px-3 text-sm font-semibold text-white transition hover:bg-zinc-800"
+            className="inline-flex h-10 items-center justify-center rounded-xl bg-indigo-600 px-3 text-sm font-semibold text-white transition hover:bg-indigo-700"
           >
             Nota
           </Link>
         </div>
-      </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm lg:col-span-2">
@@ -494,5 +460,6 @@ export default async function TransactionDetailPage({
         </div>
       </div>
     </div>
+    </PageShell>
   );
 }

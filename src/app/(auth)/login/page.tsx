@@ -10,7 +10,13 @@ export default async function LoginPage({
   searchParams?: Promise<{ error?: string }>;
 }) {
   const sp = await searchParams;
-  const hasError = sp?.error === "1";
+  const errorCode = sp?.error;
+  const errorMessage =
+    errorCode === "inactive"
+      ? "Akun ini dinonaktifkan. Hubungi admin."
+      : errorCode === "1"
+        ? "Email atau password salah."
+        : null;
 
   const supabase = await createClient();
   const {
@@ -36,9 +42,9 @@ export default async function LoginPage({
         </div>
       </div>
 
-      {hasError ? (
+      {errorMessage ? (
         <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-50">
-          Email atau password salah.
+          {errorMessage}
         </div>
       ) : null}
 

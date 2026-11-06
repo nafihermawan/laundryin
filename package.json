@@ -14,6 +14,7 @@
   "dependencies": {
     "@supabase/ssr": "^0.9.0",
     "@supabase/supabase-js": "^2.99.2",
+    "lucide-react": "^1.69.0",
     "next": "16.2.0",
     "qrcode": "^1.5.4",
     "qrcode.react": "^4.2.0",

@@ -18,14 +18,26 @@ const paymentColors: Record<"paid" | "pending", string> = {
   pending: "bg-amber-100 text-amber-700 border-amber-200",
 };
 
-export function TransactionList({ initialTransactions }: { initialTransactions: Transaction[] }) {
+export function TransactionList({
+  initialTransactions,
+  initialStatus = "semua",
+  initialPayment = "semua",
+  initialFrom = "",
+  initialTo = "",
+}: {
+  initialTransactions: Transaction[];
+  initialStatus?: string;
+  initialPayment?: "semua" | "paid" | "unpaid";
+  initialFrom?: string;
+  initialTo?: string;
+}) {
   const router = useRouter();
   const [isPending] = useTransition();
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterStatus, setFilterStatus] = useState("semua");
-  const [filterPaymentStatus, setFilterPaymentStatus] = useState<"semua" | "paid" | "unpaid">("semua");
-  const [dateFrom, setDateFrom] = useState<string>("");
-  const [dateTo, setDateTo] = useState<string>("");
+  const [filterStatus, setFilterStatus] = useState(initialStatus);
+  const [filterPaymentStatus, setFilterPaymentStatus] = useState<"semua" | "paid" | "unpaid">(initialPayment);
+  const [dateFrom, setDateFrom] = useState<string>(initialFrom);
+  const [dateTo, setDateTo] = useState<string>(initialTo);
   const [page, setPage] = useState(1);
   const [filterOpen, setFilterOpen] = useState(false);
   const [filterHeight, setFilterHeight] = useState<number | null>(null);
