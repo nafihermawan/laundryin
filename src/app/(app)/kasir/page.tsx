@@ -2,13 +2,14 @@ import { redirect } from "next/navigation";
 import { Briefcase, History } from "lucide-react";
 
 import { HomeHeader } from "@/components/app/home-header";
-import { KasirBottomNav } from "@/components/app/kasir-bottom-nav";
+import { BottomNav } from "@/components/app/bottom-nav";
 import { MenuGroup, MenuRow } from "@/components/app/menu-group";
 import { SummaryCard } from "@/components/app/summary-card";
 import { getActiveCashRegister } from "@/lib/auth/cash-register";
 import { createClient } from "@/lib/supabase/server";
 
 import { ShiftCard } from "./shift-card";
+import { BukaShiftToast } from "./buka-shift-toast";
 
 function formatToday(date: Date) {
   return new Intl.DateTimeFormat("id-ID", {
@@ -73,11 +74,11 @@ export default async function KasirPage() {
 
   return (
     <div className="flex min-h-full flex-1 flex-col">
+      <BukaShiftToast />
       <HomeHeader name={displayName} homeHref="/kasir" accountHref="/kasir/akun" />
 
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-[120px] pt-5">
-        <div className="flex flex-col gap-6">
-          <div className="flex flex-col gap-1">
+      <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 pb-[120px] pt-5">
+        <div className="flex flex-col gap-1">
             <h1 className="font-display text-[18px] font-semibold tracking-[-0.01em] text-slate-900">
               Halo, {displayName}
             </h1>
@@ -137,10 +138,9 @@ export default async function KasirPage() {
               tone="primary"
             />
           </MenuGroup>
-        </div>
       </main>
 
-      <KasirBottomNav hasActiveShift={shiftStatus.isOpen} />
+      <BottomNav role="cashier" hasActiveShift={shiftStatus.isOpen} />
     </div>
   );
 }

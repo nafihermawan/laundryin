@@ -6,13 +6,19 @@ import { ArrowLeft } from "lucide-react";
 export function PageHeader({
   title,
   fallbackHref = "/admin",
+  onBack,
 }: {
   title: string;
   fallbackHref?: string;
+  onBack?: () => void;
 }) {
   const router = useRouter();
 
   function handleBack() {
+    if (onBack) {
+      onBack();
+      return;
+    }
     if (typeof window !== "undefined" && window.history.length > 1) {
       router.back();
     } else {

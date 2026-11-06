@@ -29,6 +29,7 @@ export type CreateMidtransQrisChargeInput = {
   orderId: string;
   grossAmount: number;
   notificationUrl: string;
+  expiryMinutes?: number;
 };
 
 export type CreateMidtransQrisChargeResult = {
@@ -48,6 +49,15 @@ function getMidtransApiBase() {
 function getBasicAuthHeader(serverKey: string) {
   const token = Buffer.from(`${serverKey}:`, "utf8").toString("base64");
   return `Basic ${token}`;
+}
+
+function formatMidtransOrderTime(date: Date) {
+  const wib = new Date(date.getTime() + 7 * 60 * 60 * 1000);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return (
+    `${wib.getUTCFullYear()}-${pad(wib.getUTCMonth() + 1)}-${pad(wib.getUTCDate())} ` +
+    `${pad(wib.getUTCHours())}:${pad(wib.getUTCMinutes())}:${pad(wib.getUTCSeconds())} +0700`
+  );
 }
 
 function formatMidtransErrorMessage(status: number, bodyText: string) {
@@ -98,6 +108,11 @@ export async function createMidtransQrisCharge(
       transaction_details: {
         order_id: input.orderId,
         gross_amount: amountInt,
+      },
+      custom_expiry: {
+        order_time: formatMidtransOrderTime(new Date()),
+        expiry_duration: input.expiryMinutes ?? 15,
+        unit: "minute",
       },
     }),
   });
@@ -154,6 +169,39 @@ export async function getMidtransTransactionStatus(orderId: string): Promise<Mid
   }
 
   return JSON.parse(bodyText) as MidtransTransactionStatusResponse;
+}
+
+export type CancelMidtransResult = {
+  ok: boolean;
+  status: string | null;
+  message: string | null;
+};
+
+export async function cancelMidtransTransaction(orderId: string): Promise<CancelMidtransResult> {
+  if (!env.MIDTRANS_SERVER_KEY) {
+    throw new Error("MIDTRANS_SERVER_KEY belum diset");
+  }
+  if (!orderId) throw new Error("orderId tidak valid");
+
+  const res = await fetch(`${getMidtransApiBase()}/v2/${encodeURIComponent(orderId)}/cancel`, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      Authorization: getBasicAuthHeader(env.MIDTRANS_SERVER_KEY),
+    },
+  });
+
+  const bodyText = await res.text();
+  let parsed: Record<string, unknown> = {};
+  try {
+    parsed = JSON.parse(bodyText) as Record<string, unknown>;
+  } catch {}
+
+  return {
+    ok: res.ok,
+    status: typeof parsed.transaction_status === "string" ? parsed.transaction_status : null,
+    message: typeof parsed.status_message === "string" ? parsed.status_message : null,
+  };
 }
 
 export function verifyMidtransSignature(payload: unknown) {

@@ -59,11 +59,10 @@ export default async function AdminPage() {
     <div className="flex min-h-full flex-1 flex-col">
       <HomeHeader name={displayName} />
 
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-[120px] pt-5">
-        <div className="flex flex-col gap-6">
-          <div className="flex flex-col gap-1">
+      <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 pb-[120px] pt-5">
+        <div className="flex flex-col gap-1">
             <div className="flex items-center gap-2">
-              <h1 className="font-display text-2xl font-bold tracking-tight text-slate-900">
+              <h1 className="font-display text-[18px] font-semibold tracking-[-0.01em] text-slate-900">
                 Halo, {displayName}
               </h1>
               <Badge variant="secondary">{roleLabel}</Badge>
@@ -145,10 +144,9 @@ export default async function AdminPage() {
               />
             </MenuGroup>
           </div>
-        </div>
       </main>
 
-      <BottomNav />
+      <BottomNav role="admin" />
     </div>
   );
 }

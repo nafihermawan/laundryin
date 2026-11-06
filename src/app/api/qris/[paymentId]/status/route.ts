@@ -24,7 +24,7 @@ export async function POST(
 
   const { data: payment, error } = await supabase
     .from("payments")
-    .select("id, method, status, provider")
+    .select("id, method, status, provider, midtrans_order_id")
     .eq("id", paymentId)
     .maybeSingle();
 
@@ -48,7 +48,10 @@ export async function POST(
     return Response.json(body, { status: 400 });
   }
 
-  const data = await getMidtransTransactionStatus(paymentId);
+  const midtransOrderId =
+    (payment as unknown as { midtrans_order_id?: string | null }).midtrans_order_id ?? paymentId;
+
+  const data = await getMidtransTransactionStatus(midtransOrderId);
   const transactionStatus = typeof data.transaction_status === "string" ? data.transaction_status : null;
   const fraudStatus = typeof data.fraud_status === "string" ? data.fraud_status : null;
   const transactionId = typeof data.transaction_id === "string" ? data.transaction_id : null;
