@@ -4,6 +4,7 @@ import NextTopLoader from "nextjs-toploader";
 import "./globals.css";
 
 import { Providers } from "@/components/providers";
+import { PrinterProvider } from "@/lib/printing/printer-provider";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -44,7 +45,9 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <NextTopLoader color="#4F46E5" height={3} showSpinner={false} />
-        <Providers>{children}</Providers>
+        <Providers>
+          <PrinterProvider>{children}</PrinterProvider>
+        </Providers>
       </body>
     </html>
   );
