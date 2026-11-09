@@ -21,11 +21,19 @@ export const getSessionProfile = cache(async (): Promise<SessionProfile | null> 
 
   if (!user) return null;
 
-  const { data: profile } = await supabase
+  let { data: profile } = await supabase
     .from("profiles")
     .select("full_name, role, is_active")
     .eq("id", user.id)
     .maybeSingle();
+
+  if (!profile) {
+    ({ data: profile } = await supabase
+      .from("profiles")
+      .select("full_name, role")
+      .eq("id", user.id)
+      .maybeSingle());
+  }
 
   return {
     id: user.id,
