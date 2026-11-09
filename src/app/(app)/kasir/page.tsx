@@ -30,14 +30,13 @@ export default async function KasirPage() {
   const supabase = await createClient();
   const displayName = profile.name;
 
-  const shiftStatus = await getActiveCashRegister(supabase, profile.id);
-
   const startOfDay = new Date();
   startOfDay.setHours(0, 0, 0, 0);
   const startISO = startOfDay.toISOString();
 
-  const [{ count: ordersToday }, { count: readyPickup }, { count: pendingPayments }] =
-    await Promise.all([
+  const [shiftStatus, countResults] = await Promise.all([
+    getActiveCashRegister(supabase, profile.id),
+    Promise.all([
       supabase
         .from("orders")
         .select("id", { count: "exact", head: true })
@@ -50,7 +49,10 @@ export default async function KasirPage() {
         .from("payments")
         .select("id", { count: "exact", head: true })
         .eq("status", "pending"),
-    ]);
+    ]),
+  ]);
+
+  const [ordersToday, readyPickup, pendingPayments] = countResults.map((r) => r.count);
 
   let cashTotal = 0;
   if (shiftStatus.isOpen && shiftStatus.registerId) {
