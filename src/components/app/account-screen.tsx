@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Info, KeyRound, UserCog } from "lucide-react";
 
 import { MenuGroup, MenuRow } from "@/components/app/menu-group";
+import { PrinterSettings } from "@/components/app/printer-settings";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
@@ -53,6 +54,8 @@ export function AccountScreen({
           trailing={<span className="text-[13px] text-slate-500">v{version}</span>}
         />
       </MenuGroup>
+
+      <PrinterSettings />
 
       <Button variant="outline" size="lg" fullWidth onClick={() => setConfirmOpen(true)}>
         Keluar dari akun

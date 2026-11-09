@@ -1,21 +1,19 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Bluetooth, Printer, Settings2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
-import {
-  ThermalPrinter,
-  isBluetoothPrintingSupported,
-  type BluetoothDeviceLike,
-} from "@/lib/printing/bluetooth-printer";
 import { buildReceiptEscPos, type ReceiptModel } from "@/lib/printing/escpos";
-
-const PAPER_KEY = "thermal-paper-width";
-const PRINTER_KEY = "thermal-printer";
-
-type PaperWidth = "58" | "80";
+import {
+  connectPrinter,
+  ensureConnected,
+  forgetPrinter,
+  setPaperWidth,
+  type PaperWidth,
+} from "@/lib/printing/printer-store";
+import { usePrinter } from "@/lib/printing/use-printer";
 
 function columnsFor(paper: PaperWidth) {
   return paper === "80" ? 48 : 32;
@@ -23,82 +21,25 @@ function columnsFor(paper: PaperWidth) {
 
 export function PrintBar({ receipt }: { receipt: ReceiptModel }) {
   const { show } = useToast();
-  const printerRef = useRef<ThermalPrinter | null>(null);
-  const [supported, setSupported] = useState(false);
-  const [paper, setPaper] = useState<PaperWidth>("58");
-  const [printerName, setPrinterName] = useState<string | null>(null);
-  const [connecting, setConnecting] = useState(false);
+  const { supported, status, name, paper } = usePrinter();
   const [printing, setPrinting] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
 
-  const rememberPrinter = useCallback((printer: ThermalPrinter | null) => {
-    printerRef.current = printer;
-    const name = printer?.name ?? null;
-    setPrinterName(name);
-    try {
-      if (printer) localStorage.setItem(PRINTER_KEY, JSON.stringify({ id: printer.id, name: printer.name }));
-      else localStorage.removeItem(PRINTER_KEY);
-    } catch {}
+  useEffect(() => {
+    // Best-effort silent reconnect to a previously granted printer.
+    void ensureConnected();
   }, []);
 
-  useEffect(() => {
-    setSupported(isBluetoothPrintingSupported());
-    try {
-      const storedPaper = localStorage.getItem(PAPER_KEY);
-      if (storedPaper === "80" || storedPaper === "58") setPaper(storedPaper);
-    } catch {}
-
-    // Best-effort silent reconnect to a previously granted printer.
-    let cancelled = false;
-    (async () => {
-      let stored: { id?: string; name?: string } | null = null;
-      try {
-        stored = JSON.parse(localStorage.getItem(PRINTER_KEY) || "null");
-      } catch {}
-      if (!stored?.id || !isBluetoothPrintingSupported()) return;
-      const devices = await ThermalPrinter.remembered();
-      const match = devices.find((d: BluetoothDeviceLike) => d.id === stored?.id);
-      if (!match || cancelled) return;
-      try {
-        const printer = await ThermalPrinter.connect(match);
-        if (!cancelled) rememberPrinter(printer);
-      } catch {
-        // needs a fresh user gesture; ignore
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [rememberPrinter]);
-
-  function changePaper(next: PaperWidth) {
-    setPaper(next);
-    try {
-      localStorage.setItem(PAPER_KEY, next);
-    } catch {}
-  }
-
-  async function connectPrinter(): Promise<ThermalPrinter | null> {
-    setConnecting(true);
-    try {
-      const printer = await ThermalPrinter.request();
-      printer.onDisconnect(() => rememberPrinter(null));
-      rememberPrinter(printer);
-      show(`Printer terhubung: ${printer.name}`);
-      return printer;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Gagal menghubungkan printer";
-      show(message, { type: "error" });
-      return null;
-    } finally {
-      setConnecting(false);
-    }
+  async function handleConnect() {
+    const result = await connectPrinter();
+    if (result.printer) show(`Printer terhubung: ${result.printer.name}`);
+    else show(result.error ?? "Gagal menghubungkan printer", { type: "error" });
+    return result.printer;
   }
 
   async function doThermalPrint() {
-    let printer = printerRef.current;
-    if (!printer) printer = await connectPrinter();
+    let printer = await ensureConnected();
+    if (!printer) printer = await handleConnect();
     if (!printer) return;
 
     setPrinting(true);
@@ -107,7 +48,6 @@ export function PrintBar({ receipt }: { receipt: ReceiptModel }) {
       await printer.print(bytes);
       show("Nota dikirim ke printer");
     } catch (err) {
-      rememberPrinter(null);
       show(err instanceof Error ? err.message : "Gagal mencetak", {
         type: "error",
         actionLabel: "Coba lagi",
@@ -131,6 +71,11 @@ export function PrintBar({ receipt }: { receipt: ReceiptModel }) {
     });
   }
 
+  function handleForget() {
+    forgetPrinter();
+    show("Printer dilupakan");
+  }
+
   return (
     <>
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white print:hidden">
@@ -145,8 +90,8 @@ export function PrintBar({ receipt }: { receipt: ReceiptModel }) {
           >
             <Settings2 className="h-3.5 w-3.5" strokeWidth={2} />
             {supported
-              ? printerName
-                ? `Printer: ${printerName} · ${paper}mm`
+              ? name
+                ? `Printer: ${name} · ${paper}mm`
                 : `Printer belum terhubung · ${paper}mm`
               : "Cetak Bluetooth hanya didukung di Chrome Android"}
           </button>
@@ -160,8 +105,8 @@ export function PrintBar({ receipt }: { receipt: ReceiptModel }) {
                 size="lg"
                 className="flex-1"
                 onClick={doThermalPrint}
-                loading={printing || connecting}
-                loadingText={connecting ? "Menghubungkan…" : "Mencetak…"}
+                loading={printing || status === "connecting"}
+                loadingText={status === "connecting" ? "Menghubungkan…" : "Mencetak…"}
               >
                 <Printer className="h-[18px] w-[18px]" strokeWidth={2} />
                 Cetak
@@ -199,7 +144,7 @@ export function PrintBar({ receipt }: { receipt: ReceiptModel }) {
                       key={value}
                       type="button"
                       aria-pressed={active}
-                      onClick={() => changePaper(value)}
+                      onClick={() => setPaperWidth(value)}
                       className={`min-h-11 flex-1 rounded-[10px] text-sm ${
                         active
                           ? "border border-indigo-600 bg-indigo-50 font-semibold text-indigo-600"
@@ -217,7 +162,7 @@ export function PrintBar({ receipt }: { receipt: ReceiptModel }) {
               <div className="flex items-center gap-2 text-sm">
                 <Bluetooth className="h-4 w-4 text-slate-500" strokeWidth={2} />
                 <span className="flex-1 text-slate-900">
-                  {printerName ?? "Belum ada printer terhubung"}
+                  {name ?? "Belum ada printer terhubung"}
                 </span>
               </div>
               {!supported ? (
@@ -227,18 +172,15 @@ export function PrintBar({ receipt }: { receipt: ReceiptModel }) {
                 </p>
               ) : (
                 <div className="mt-3 flex flex-col gap-2">
-                  <Button onClick={connectPrinter} loading={connecting} loadingText="Menghubungkan…">
-                    {printerName ? "Ganti printer" : "Hubungkan printer"}
+                  <Button
+                    onClick={handleConnect}
+                    loading={status === "connecting"}
+                    loadingText="Menghubungkan…"
+                  >
+                    {name ? "Ganti printer" : "Hubungkan printer"}
                   </Button>
-                  {printerName ? (
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        printerRef.current?.disconnect();
-                        rememberPrinter(null);
-                        show("Printer dilupakan");
-                      }}
-                    >
+                  {name ? (
+                    <Button variant="outline" onClick={handleForget}>
                       Lupakan printer
                     </Button>
                   ) : null}
