@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 
 import { PageHeader } from "@/components/app/page-header";
+import { paymentMethodLabel, parseCashBreakdown } from "@/lib/printing/escpos";
+import { STORE_PHONE } from "@/lib/store-config";
 import { createClient } from "@/lib/supabase/server";
 
 import { PrintBar } from "./print-bar";
@@ -24,6 +26,15 @@ function formatDate(dateStr: string) {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(dateStr));
+}
+
+function PaymentRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-start justify-between gap-4">
+      <span className="text-[#64748B]">{label}</span>
+      <span className="text-right font-semibold text-zinc-900">{value}</span>
+    </div>
+  );
 }
 
 export const dynamic = "force-dynamic";
@@ -103,10 +114,16 @@ export default async function NotaPage({
           amount: Number(paidPayment.amount ?? 0),
           paidAt: paidPayment.paid_at ?? null,
           referenceNo: paidPayment.reference_no ?? null,
+          notes: paidPayment.notes ?? null,
         }
       : null,
     notes: order.notes ?? null,
   };
+
+  const isPaid = paidPayment !== null;
+  const isCash = paidPayment?.method?.toLowerCase() === "cash";
+  const { cashReceived, change } = parseCashBreakdown(paidPayment?.notes ?? null);
+  const methodLabel = paymentMethodLabel(paidPayment?.method ?? null);
 
   return (
     <div className="flex min-h-full flex-1 flex-col">
@@ -115,13 +132,14 @@ export default async function NotaPage({
       </div>
       <main
         className="mx-auto w-full max-w-6xl flex-1 px-4 pt-5"
-        style={{ paddingBottom: "calc(96px + env(safe-area-inset-bottom))" }}
+        style={{ paddingBottom: "calc(112px + env(safe-area-inset-bottom))" }}
       >
       <div className="flex flex-col gap-6">
       <div className="mx-auto w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm print:border-0 print:shadow-none">
         <div className="flex flex-col items-center gap-1">
           <div className="text-base font-semibold tracking-tight">laundry.in</div>
-          <div className="text-xs text-zinc-500">Nota transaksi</div>
+          <div className="text-[12px] text-[#64748B]">Telp {STORE_PHONE}</div>
+          <div className="text-[12px] text-[#64748B]">Nota transaksi</div>
         </div>
 
         <div className="mt-6 grid gap-2 text-sm">
@@ -172,24 +190,21 @@ export default async function NotaPage({
             <span className="text-sm font-semibold text-zinc-900">TOTAL</span>
             <span className="text-sm font-semibold text-zinc-900">{formatIDR(total)}</span>
           </div>
-          <div className="mt-2 flex items-start justify-between gap-4 text-sm">
-            <span className="text-zinc-500">Pembayaran</span>
-            <span className="text-right text-zinc-900">
-              {paidPayment ? (
-                <>
-                  <span className="font-medium">{paidPayment.method}</span>
-                  <span className="block text-xs text-zinc-500">
-                    {paidPayment.paid_at ? formatDate(paidPayment.paid_at) : "-"} ·{" "}
-                    {formatIDR(Number(paidPayment.amount ?? 0))}
-                  </span>
-                  {paidPayment.reference_no ? (
-                    <span className="block text-xs text-zinc-500">Ref: {paidPayment.reference_no}</span>
-                  ) : null}
-                </>
-              ) : (
-                <span className="font-medium text-amber-700">Belum lunas</span>
-              )}
-            </span>
+          <div className="mt-3 flex flex-col gap-2 text-sm">
+            <PaymentRow label="Metode pembayaran" value={methodLabel} />
+            <PaymentRow label="Status" value={isPaid ? "Lunas" : "Belum bayar"} />
+            {isPaid && paidPayment?.paid_at ? (
+              <PaymentRow label="Dibayar" value={formatDate(paidPayment.paid_at)} />
+            ) : null}
+            {!isPaid ? (
+              <PaymentRow label="Sisa tagihan" value={formatIDR(total)} />
+            ) : null}
+            {isPaid && isCash && cashReceived !== null ? (
+              <PaymentRow label="Diterima" value={formatIDR(cashReceived)} />
+            ) : null}
+            {isPaid && isCash && change !== null ? (
+              <PaymentRow label="Kembalian" value={formatIDR(change)} />
+            ) : null}
           </div>
         </div>
 
@@ -200,8 +215,17 @@ export default async function NotaPage({
           </div>
         ) : null}
 
-        <div className="mt-8 text-center text-xs text-zinc-500">
-          Terima kasih.
+        <div className="mt-6 rounded-[10px] border border-dashed border-slate-400 px-3 py-2.5 text-center text-[13px] font-semibold text-zinc-900">
+          Harap bawa nota ini saat mengambil cucian.
+        </div>
+
+        <div className="mt-6 flex flex-col items-center gap-1 text-center text-[12px] leading-[1.5]">
+          <p className="text-[#64748B]">
+            Periksa kembali cucian Anda sebelum meninggalkan tempat.
+          </p>
+          <p className="font-semibold text-zinc-900">
+            Terima kasih telah mempercayakan cucian Anda kepada kami.
+          </p>
         </div>
       </div>
       </div>
