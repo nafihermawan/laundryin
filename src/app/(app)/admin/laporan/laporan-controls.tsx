@@ -153,7 +153,7 @@ export function LaporanControls({
 
       {filterOpen ? (
         <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/30 p-3 sm:items-center sm:p-4"
+          className="fixed inset-0 z-[60] flex items-end justify-center bg-black/30 p-3 sm:items-center sm:p-4"
           onMouseDown={(e) => {
             if (e.target === e.currentTarget) {
               setFilterOpen(false);

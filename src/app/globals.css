@@ -20,6 +20,11 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Keep focused fields / scrollIntoView clear of the sticky header. */
+html {
+  scroll-padding-top: calc(64px + env(safe-area-inset-top, 0px) + 12px);
+}
+
 @keyframes skeleton-pulse {
   0%,
   100% {
@@ -40,6 +45,14 @@ body {
   }
 }
 
-#nprogress {
-  top: env(safe-area-inset-top);
+/* Nav progress bar: below the safe area, above the sticky header (40). */
+#nprogress,
+#nprogress .bar {
+  top: env(safe-area-inset-top, 0px);
+  z-index: 45 !important;
+}
+
+/* Toasts sit above the header/bottom nav (40) but below dialogs/sheets (60). */
+[data-sonner-toaster] {
+  z-index: 50 !important;
 }

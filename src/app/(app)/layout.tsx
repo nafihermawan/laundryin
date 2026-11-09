@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 
-import { OfflineBanner } from "@/components/app/offline-banner";
 import { getSessionProfile } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 
@@ -20,9 +19,6 @@ export default async function AppLayout({
   }
 
   return (
-    <>
-      <OfflineBanner />
-      <div className="flex min-h-full flex-1 flex-col bg-slate-50 text-slate-900">{children}</div>
-    </>
+    <div className="flex min-h-full flex-1 flex-col bg-slate-50 text-slate-900">{children}</div>
   );
 }

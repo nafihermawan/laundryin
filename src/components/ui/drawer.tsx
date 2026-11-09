@@ -191,7 +191,7 @@ export function Drawer({
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-50" role="dialog" aria-modal="true">
+    <div className="fixed inset-0 z-[60]" role="dialog" aria-modal="true">
       <div
         aria-hidden="true"
         onClick={onClose}

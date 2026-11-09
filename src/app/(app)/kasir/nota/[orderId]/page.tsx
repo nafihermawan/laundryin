@@ -127,9 +127,7 @@ export default async function NotaPage({
 
   return (
     <div className="flex min-h-full flex-1 flex-col">
-      <div className="print:hidden">
-        <PageHeader title="Nota" />
-      </div>
+      <PageHeader title="Nota" className="print:hidden" />
       <main
         className="mx-auto w-full max-w-6xl flex-1 px-4 pt-5"
         style={{ paddingBottom: "calc(112px + env(safe-area-inset-bottom))" }}

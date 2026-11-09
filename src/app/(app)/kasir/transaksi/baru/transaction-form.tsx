@@ -448,7 +448,7 @@ export function TransactionForm({ services }: { services: ServiceOption[] }) {
       ) : null}
 
       {confirmClear ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">
           <div role="dialog" aria-modal="true" className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
             <h2 className="text-base font-semibold text-slate-900">Kosongkan semua isian?</h2>
             <div className="mt-5 flex flex-col gap-2">
@@ -462,7 +462,7 @@ export function TransactionForm({ services }: { services: ServiceOption[] }) {
       ) : null}
 
       {confirmLeave ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">
           <div role="dialog" aria-modal="true" className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
             <h2 className="text-base font-semibold text-slate-900">Batalkan transaksi ini?</h2>
             <p className="mt-1 text-sm text-slate-500">Isian akan hilang.</p>
