@@ -31,12 +31,14 @@ function formatJam(iso: string) {
 }
 
 export function ShiftCard({
+  name,
   isOpen,
   registerId,
   openedAt,
   startingCash,
   cashTotal,
 }: {
+  name: string;
   isOpen: boolean;
   registerId?: string;
   openedAt?: string;
@@ -51,7 +53,15 @@ export function ShiftCard({
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const expectedCash = startingCash + cashTotal;
+  // Local shift state so the card flips immediately after open/close succeeds.
+  // The parent keys this component on the shift open/closed state, so it
+  // re-initialises from fresh server props once router.refresh() lands.
+  const [open, setOpen] = useState(isOpen);
+  const [opened, setOpened] = useState<string | undefined>(openedAt);
+  const [startCash, setStartCash] = useState(startingCash);
+  const [cash, setCash] = useState(cashTotal);
+
+  const expectedCash = startCash + cash;
   const cashNum = Number(cashInput) || 0;
   const variance = cashNum - expectedCash;
 
@@ -88,70 +98,83 @@ export function ShiftCard({
       return;
     }
 
+    if (dialog === "open") {
+      setOpen(true);
+      setOpened(new Date().toISOString());
+      setStartCash(value);
+      setCash(0);
+      show("Shift dibuka");
+    } else {
+      setOpen(false);
+      setOpened(undefined);
+      setStartCash(0);
+      setCash(0);
+      show("Shift ditutup");
+    }
     setDialog(null);
-    show(dialog === "open" ? "Shift dibuka" : "Shift ditutup");
     router.refresh();
   }
 
   return (
-    <section id="shift-card" className="rounded-2xl border border-slate-200 bg-white p-4">
-      <div className="flex flex-col gap-4">
-        <div className="flex items-center gap-3">
+    <section
+      id="shift-card"
+      className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4"
+    >
+      <div className="flex items-center gap-3">
+        <span
+          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${
+            open ? "bg-emerald-100" : "bg-orange-100"
+          }`}
+        >
+          {open ? (
+            <LockOpen className="h-5 w-5 text-emerald-700" strokeWidth={2} />
+          ) : (
+            <Lock className="h-5 w-5 text-orange-700" strokeWidth={2} />
+          )}
+        </span>
+
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
           <span
-            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${
-              isOpen ? "bg-emerald-100" : "bg-orange-100"
+            className={`flex items-center gap-1.5 text-xs font-semibold ${
+              open ? "text-emerald-700" : "text-orange-700"
             }`}
           >
-            {isOpen ? (
-              <LockOpen className="h-5 w-5 text-emerald-700" strokeWidth={2} />
-            ) : (
-              <Lock className="h-5 w-5 text-orange-700" strokeWidth={2} />
-            )}
-          </span>
-
-          <div className="flex flex-1 flex-col gap-1">
             <span
-              className={`flex items-center gap-1.5 text-xs font-semibold ${
-                isOpen ? "text-emerald-700" : "text-orange-700"
-              }`}
-            >
-              <span
-                className={`h-1.5 w-1.5 rounded-full ${isOpen ? "bg-emerald-500" : "bg-amber-500"}`}
-              />
-              {isOpen && openedAt ? `Aktif sejak ${formatJam(openedAt)}` : "Belum dibuka"}
-            </span>
-            <span className="font-display text-[17px] font-bold tracking-[-0.01em] text-slate-900">
-              Shift kasir
-            </span>
-          </div>
-
-          {isOpen ? (
-            <Button variant="outline" onClick={() => openDialog("close")}>
-              Tutup shift
-            </Button>
-          ) : (
-            <Button onClick={() => openDialog("open")}>Buka shift</Button>
-          )}
+              className={`h-1.5 w-1.5 rounded-full ${open ? "bg-emerald-500" : "bg-amber-500"}`}
+            />
+            {open && opened ? `Shift aktif sejak ${formatJam(opened)}` : "Shift belum dibuka"}
+          </span>
+          <span className="truncate font-display text-[17px] font-bold tracking-[-0.01em] text-slate-900">
+            {name}
+          </span>
         </div>
 
-        {isOpen ? (
-          <dl
-            className="grid gap-x-2 gap-y-2.5 border-t border-slate-200 pt-3.5 text-sm"
-            style={{ gridTemplateColumns: "auto auto 1fr" }}
-          >
-            <dt className="text-slate-500">Kas Awal</dt>
-            <dd className="text-slate-500">:</dd>
-            <dd className="font-semibold text-slate-900">{formatIDR(startingCash)}</dd>
-            <dt className="text-slate-500">Tunai</dt>
-            <dd className="text-slate-500">:</dd>
-            <dd className="font-semibold text-slate-900">{formatIDR(cashTotal)}</dd>
-          </dl>
+        {open ? (
+          <Button variant="outline" onClick={() => openDialog("close")}>
+            Tutup shift
+          </Button>
         ) : (
-          <p className="text-sm leading-relaxed text-slate-500">
-            Buka shift dan catat uang kas awal sebelum mulai menerima transaksi.
-          </p>
+          <Button onClick={() => openDialog("open")}>Buka shift</Button>
         )}
       </div>
+
+      {open ? (
+        <dl
+          className="grid gap-x-2 gap-y-2.5 border-t border-slate-200 pt-3.5 text-sm"
+          style={{ gridTemplateColumns: "auto auto 1fr" }}
+        >
+          <dt className="text-slate-500">Kas Awal</dt>
+          <dd className="text-slate-500">:</dd>
+          <dd className="font-semibold text-slate-900">{formatIDR(startCash)}</dd>
+          <dt className="text-slate-500">Tunai</dt>
+          <dd className="text-slate-500">:</dd>
+          <dd className="font-semibold text-slate-900">{formatIDR(cash)}</dd>
+        </dl>
+      ) : (
+        <p className="border-t border-slate-200 pt-[14px] text-[13px] leading-[1.5] text-slate-500">
+          Buka shift dan catat uang kas awal sebelum mulai menerima transaksi.
+        </p>
+      )}
 
       {dialog ? (
         <div
