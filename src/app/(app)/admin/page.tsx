@@ -5,7 +5,7 @@ import { HomeHeader } from "@/components/app/home-header";
 import { MenuGroup, MenuRow } from "@/components/app/menu-group";
 import { SummaryCard } from "@/components/app/summary-card";
 import { Badge } from "@/components/ui/badge";
-import { getUserRole } from "@/lib/auth/get-user-role";
+import { getSessionProfile } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 
 function formatToday(date: Date) {
@@ -19,19 +19,11 @@ function formatToday(date: Date) {
 }
 
 export default async function AdminPage() {
+  const profile = await getSessionProfile();
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  const role = user ? await getUserRole(supabase, user.id) : "cashier";
-  const { data: profile } = user
-    ? await supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle()
-    : { data: null };
-
-  const displayName = profile?.full_name?.trim() || user?.email || "User";
-  const roleLabel = role === "admin" ? "Admin" : "Kasir";
+  const displayName = profile?.name ?? "User";
+  const roleLabel = profile?.role === "admin" ? "Admin" : "Kasir";
 
   const startOfDay = new Date();
   startOfDay.setHours(0, 0, 0, 0);

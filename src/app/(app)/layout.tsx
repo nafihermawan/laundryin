@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { OfflineBanner } from "@/components/app/offline-banner";
+import { getSessionProfile } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function AppLayout({
@@ -8,20 +9,12 @@ export default async function AppLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const profile = await getSessionProfile();
 
-  if (!user) redirect("/login");
+  if (!profile) redirect("/login");
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("is_active")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  if (profile?.is_active === false) {
+  if (!profile.isActive) {
+    const supabase = await createClient();
     await supabase.auth.signOut();
     redirect("/login?error=inactive");
   }

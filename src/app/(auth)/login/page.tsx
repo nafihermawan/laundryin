@@ -2,20 +2,15 @@ import { redirect } from "next/navigation";
 import { WashingMachine } from "lucide-react";
 
 import { APP_VERSION } from "@/lib/app-version";
-import { getUserRole } from "@/lib/auth/get-user-role";
-import { createClient } from "@/lib/supabase/server";
+import { getSessionProfile } from "@/lib/auth/session";
 
 import { LoginForm } from "./login-form";
 
 export default async function LoginPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const profile = await getSessionProfile();
 
-  if (user) {
-    const role = await getUserRole(supabase, user.id);
-    redirect(role === "admin" ? "/admin" : "/kasir");
+  if (profile) {
+    redirect(profile.role === "admin" ? "/admin" : "/kasir");
   }
 
   return (

@@ -6,6 +6,7 @@ import { BottomNav } from "@/components/app/bottom-nav";
 import { MenuGroup, MenuRow } from "@/components/app/menu-group";
 import { SummaryCard } from "@/components/app/summary-card";
 import { getActiveCashRegister } from "@/lib/auth/cash-register";
+import { getSessionProfile } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 
 import { ShiftCard } from "./shift-card";
@@ -22,22 +23,14 @@ function formatToday(date: Date) {
 }
 
 export default async function KasirPage() {
+  const profile = await getSessionProfile();
+
+  if (!profile) redirect("/login");
+
   const supabase = await createClient();
+  const displayName = profile.name;
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) redirect("/login");
-
-  const shiftStatus = await getActiveCashRegister(supabase, user.id);
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("full_name")
-    .eq("id", user.id)
-    .maybeSingle();
-  const displayName = profile?.full_name?.trim() || user.email || "User";
+  const shiftStatus = await getActiveCashRegister(supabase, profile.id);
 
   const startOfDay = new Date();
   startOfDay.setHours(0, 0, 0, 0);

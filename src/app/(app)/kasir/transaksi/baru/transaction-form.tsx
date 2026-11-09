@@ -10,7 +10,6 @@ import { Field, inputClass } from "@/components/ui/field";
 import { QtyStepper } from "@/components/ui/qty-stepper";
 import { ServiceSelect, type ServiceOption } from "@/components/ui/service-select";
 import { useToast } from "@/components/ui/toast";
-import { createClient } from "@/lib/supabase/browser";
 import { useKeyboardOpen } from "@/lib/use-keyboard-open";
 
 import { saveTransaction } from "./actions";
@@ -71,12 +70,10 @@ function newItem(): ItemRow {
   return { id: `item-${itemSeq++}`, serviceId: null, serviceName: "", unit: "kg", qty: 1, price: 0 };
 }
 
-export function TransactionForm() {
+export function TransactionForm({ services }: { services: ServiceOption[] }) {
   const router = useRouter();
   const { show } = useToast();
   const keyboardOpen = useKeyboardOpen();
-
-  const [services, setServices] = useState<ServiceOption[]>([]);
 
   const [receivedAt, setReceivedAt] = useState("");
   const [dueAt, setDueAt] = useState("");
@@ -96,18 +93,6 @@ export function TransactionForm() {
   const itemsRef = useRef<HTMLDivElement>(null);
   const dueRef = useRef<HTMLInputElement>(null);
   const noteRef = useRef<HTMLTextAreaElement>(null);
-
-  useEffect(() => {
-    const supabase = createClient();
-    supabase
-      .from("services")
-      .select("id, name, unit, base_price")
-      .eq("is_active", true)
-      .order("name")
-      .then(({ data }) => {
-        if (data) setServices(data as ServiceOption[]);
-      });
-  }, []);
 
   useEffect(() => {
     const now = new Date();

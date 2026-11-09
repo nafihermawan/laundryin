@@ -1,6 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
-
-import { getUserRole } from "./get-user-role";
+import { getSessionProfile } from "./session";
 import type { UserRole } from "./roles";
 
 export type AccountInfo = {
@@ -11,24 +9,14 @@ export type AccountInfo = {
 };
 
 export async function getAccount(): Promise<AccountInfo | null> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const profile = await getSessionProfile();
 
-  if (!user) return null;
-
-  const role = await getUserRole(supabase, user.id);
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("full_name")
-    .eq("id", user.id)
-    .maybeSingle();
+  if (!profile) return null;
 
   return {
-    id: user.id,
-    name: profile?.full_name?.trim() || user.email || "User",
-    email: user.email ?? "",
-    role,
+    id: profile.id,
+    name: profile.name,
+    email: profile.email,
+    role: profile.role,
   };
 }

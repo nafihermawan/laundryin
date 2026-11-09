@@ -1,6 +1,7 @@
 import { PageShell } from "@/components/app/page-shell";
 import { createClient } from "@/lib/supabase/server";
 import { getActiveCashRegister } from "@/lib/auth/cash-register";
+import { getSessionProfile } from "@/lib/auth/session";
 import { redirect } from "next/navigation";
 import { ShiftForm } from "./shift-form";
 
@@ -9,17 +10,14 @@ export const metadata = {
 };
 
 export default async function ShiftPage() {
-  const supabase = await createClient();
+  const profile = await getSessionProfile();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/auth/sign-in");
+  if (!profile) {
+    redirect("/login");
   }
 
-  const shiftStatus = await getActiveCashRegister(supabase, user.id);
+  const supabase = await createClient();
+  const shiftStatus = await getActiveCashRegister(supabase, profile.id);
 
   let expectedCash = 0;
   if (shiftStatus.isOpen && shiftStatus.registerId) {
