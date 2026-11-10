@@ -1,7 +1,9 @@
 "use client";
 
-import { MenuGroup } from "@/components/app/menu-group";
-import { PrinterStatus } from "@/components/app/printer-status";
+import { useState } from "react";
+
+import { PrinterStatusView } from "@/components/app/printer-status";
+import { SectionHeading } from "@/components/app/section-heading";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 import { buildReceiptEscPos, type ReceiptModel } from "@/lib/printing/escpos";
@@ -27,12 +29,9 @@ export function PrinterSettings() {
   const { supported, status, name, paper, connect, ensureConnected, forget, setPaper, send } =
     usePrinter();
 
-  const connected = status === "terhubung";
+  const [confirmForget, setConfirmForget] = useState(false);
+  const configured = Boolean(name);
   const busy = status === "menyambungkan";
-
-  async function handleConnect() {
-    await connect();
-  }
 
   async function handleTestPrint() {
     const ready = (await ensureConnected()) || (await connect());
@@ -48,67 +47,104 @@ export function PrinterSettings() {
 
   function handleForget() {
     forget();
+    setConfirmForget(false);
     show("Printer dilupakan");
   }
 
   return (
-    <MenuGroup title="Printer">
-      <div className="flex flex-col gap-4 p-4">
-        <PrinterStatus />
+    <div className="flex flex-col gap-6">
+      <section className="rounded-2xl border border-slate-200 bg-white p-4">
+        <PrinterStatusView size="lg" />
+      </section>
 
-        {supported ? (
-          <>
-            <div className="flex flex-col gap-2">
-              <Button variant="outline" size="md" onClick={handleTestPrint} disabled={busy}>
+      {supported ? (
+        <>
+          {configured ? (
+            <div className="grid grid-cols-2 gap-2">
+              <Button variant="outline" onClick={handleTestPrint} disabled={busy}>
                 Cetak tes
               </Button>
               <Button
-                variant={connected ? "outline" : "primary"}
-                onClick={handleConnect}
+                variant="outline"
+                onClick={connect}
                 loading={busy}
-                loadingText="Menghubungkan…"
+                loadingText="Menyambungkan…"
               >
-                {name ? "Ganti printer" : "Hubungkan printer"}
+                Ganti printer
               </Button>
-              {name ? (
-                <Button variant="outline" onClick={handleForget}>
-                  Lupakan printer
-                </Button>
-              ) : null}
             </div>
+          ) : (
+            <Button fullWidth onClick={connect} loading={busy} loadingText="Menyambungkan…">
+              Pilih printer
+            </Button>
+          )}
 
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-[0.06em] text-slate-500">
-                Ukuran kertas
-              </div>
-              <div className="mt-2 flex gap-2">
-                {PAPER_OPTIONS.map((value) => {
-                  const active = paper === value;
-                  return (
-                    <button
-                      key={value}
-                      type="button"
-                      aria-pressed={active}
-                      onClick={() => setPaper(value)}
-                      className={`min-h-11 flex-1 rounded-[10px] text-sm ${
-                        active
-                          ? "border border-indigo-600 bg-indigo-50 font-semibold text-indigo-600"
-                          : "border border-slate-200 bg-white font-medium text-slate-600"
-                      }`}
-                    >
-                      {value}mm
-                    </button>
-                  );
-                })}
-              </div>
+          <section>
+            <SectionHeading>Ukuran kertas</SectionHeading>
+            <div className="flex gap-2">
+              {PAPER_OPTIONS.map((value) => {
+                const active = paper === value;
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => setPaper(value)}
+                    className={`min-h-11 flex-1 rounded-[10px] text-sm ${
+                      active
+                        ? "border border-indigo-600 bg-indigo-50 font-semibold text-indigo-600"
+                        : "border border-slate-200 bg-white font-medium text-slate-600"
+                    }`}
+                  >
+                    {value} mm
+                  </button>
+                );
+              })}
             </div>
-          </>
-        ) : (
-          <p className="text-[13px] text-slate-500">
-            Cetak Bluetooth hanya didukung di Chrome Android.
-          </p>
-        )}
-      </div>
-    </MenuGroup>
+          </section>
+
+          {configured ? (
+            <button
+              type="button"
+              onClick={() => setConfirmForget(true)}
+              className="self-center py-2 text-sm font-semibold text-red-700"
+            >
+              Lupakan printer
+            </button>
+          ) : null}
+        </>
+      ) : null}
+
+      {confirmForget ? (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setConfirmForget(false);
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="forget-printer-title"
+            className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-5 shadow-xl"
+          >
+            <h2 id="forget-printer-title" className="text-base font-semibold text-slate-900">
+              Lupakan printer?
+            </h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Printer yang tersimpan akan dihapus dari perangkat ini.
+            </p>
+            <div className="mt-5 flex flex-col gap-2">
+              <Button variant="danger" onClick={handleForget}>
+                Ya, lupakan
+              </Button>
+              <Button variant="outline" onClick={() => setConfirmForget(false)}>
+                Batal
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </div>
   );
 }

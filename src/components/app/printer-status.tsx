@@ -1,89 +1,202 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Printer } from "lucide-react";
+import { ChevronRight, Printer } from "lucide-react";
 
 import { usePrinter } from "@/lib/printing/printer-provider";
 import type { PrinterStatus as PrinterStatusValue } from "@/lib/printing/printer-machine";
 
-const DOT_COLORS: Record<Exclude<PrinterStatusValue, "belum diatur">, string> = {
-  terhubung: "#10B981",
-  menyambungkan: "#F59E0B",
-  terputus: "#94A3B8",
+type Size = "sm" | "md" | "lg";
+
+const DOT_CLASS: Record<Exclude<PrinterStatusValue, "belum diatur">, string> = {
+  terhubung: "bg-emerald-500",
+  menyambungkan: "bg-amber-500",
+  terputus: "bg-slate-400",
 };
 
-const TEXT_COLORS: Record<PrinterStatusValue, string> = {
-  terhubung: "#047857",
-  menyambungkan: "#B45309",
-  terputus: "#64748B",
-  "belum diatur": "#64748B",
+const TEXT_CLASS: Record<PrinterStatusValue, string> = {
+  terhubung: "text-emerald-700",
+  menyambungkan: "text-amber-700",
+  terputus: "text-slate-500",
+  "belum diatur": "text-slate-500",
 };
 
-const TEXT_LABELS: Record<Exclude<PrinterStatusValue, "belum diatur">, string> = {
-  terhubung: "Terhubung",
-  menyambungkan: "Menyambungkan…",
-  terputus: "Terputus · Ketuk untuk sambungkan",
+const SIZES: Record<
+  Size,
+  { box: string; icon: string; dot: string; name: string; detail: string; gap: string }
+> = {
+  sm: {
+    box: "h-9 w-9 rounded-[10px]",
+    icon: "h-[18px] w-[18px]",
+    dot: "h-2.5 w-2.5",
+    name: "text-[13px]",
+    detail: "text-[12px]",
+    gap: "gap-2.5",
+  },
+  md: {
+    box: "h-10 w-10 rounded-[10px]",
+    icon: "h-5 w-5",
+    dot: "h-3 w-3",
+    name: "text-[15px]",
+    detail: "text-[13px]",
+    gap: "gap-3",
+  },
+  lg: {
+    box: "h-14 w-14 rounded-[14px]",
+    icon: "h-6 w-6",
+    dot: "h-3.5 w-3.5",
+    name: "text-[17px]",
+    detail: "text-[14px]",
+    gap: "gap-3.5",
+  },
 };
 
-export function PrinterStatus({ accountHref = "/kasir/akun" }: { accountHref?: string }) {
+type Description = {
+  unsupported: boolean;
+  name: string | null;
+  detail: string;
+  dot: string | null;
+  pulsing: boolean;
+  textClass: string;
+  aria: string;
+};
+
+function describe(snapshot: {
+  supported: boolean;
+  status: PrinterStatusValue;
+  name: string | null;
+  paper: string;
+}): Description {
+  if (!snapshot.supported) {
+    return {
+      unsupported: true,
+      name: null,
+      detail: "Cetak Bluetooth hanya di Chrome Android",
+      dot: null,
+      pulsing: false,
+      textClass: "text-slate-500",
+      aria: "Pengaturan printer, cetak Bluetooth hanya di Chrome Android",
+    };
+  }
+
+  if (snapshot.status === "belum diatur") {
+    return {
+      unsupported: false,
+      name: "Printer belum diatur",
+      detail: "Ketuk untuk memilih printer",
+      dot: null,
+      pulsing: false,
+      textClass: "text-slate-500",
+      aria: "Pengaturan printer, printer belum diatur",
+    };
+  }
+
+  const printerName = snapshot.name ?? "Printer Bluetooth";
+  const { status, paper } = snapshot;
+
+  return {
+    unsupported: false,
+    name: printerName,
+    detail:
+      status === "terhubung"
+        ? `Terhubung · ${paper} mm`
+        : status === "menyambungkan"
+          ? "Menyambungkan…"
+          : `Terputus · ${paper} mm`,
+    dot: DOT_CLASS[status],
+    pulsing: status === "menyambungkan",
+    textClass: TEXT_CLASS[status],
+    aria: `Pengaturan printer, ${printerName} ${
+      status === "terhubung" ? "terhubung" : status === "menyambungkan" ? "menyambungkan" : "terputus"
+    }`,
+  };
+}
+
+export function PrinterStatusView({
+  size = "md",
+  className = "",
+}: {
+  size?: Size;
+  className?: string;
+}) {
+  const snapshot = usePrinter();
+  const info = describe(snapshot);
+  const s = SIZES[size];
+
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className={`flex min-w-0 items-center ${s.gap} ${className}`}
+    >
+      <span className={`relative flex shrink-0 items-center justify-center bg-slate-100 ${s.box}`}>
+        <Printer className={`${s.icon} text-slate-700`} strokeWidth={2} />
+        {info.dot ? (
+          <span
+            className={`absolute -bottom-px -right-px rounded-full border-2 border-white ${s.dot} ${info.dot} ${
+              info.pulsing ? "animate-pulse" : ""
+            }`}
+          />
+        ) : null}
+      </span>
+
+      <span className="flex min-w-0 flex-1 flex-col">
+        {info.unsupported ? (
+          <span className={`${s.detail} font-medium text-slate-500`}>{info.detail}</span>
+        ) : (
+          <>
+            <span className={`truncate font-semibold text-slate-900 ${s.name}`}>{info.name}</span>
+            <span className={`font-medium ${s.detail} ${info.textClass}`}>{info.detail}</span>
+          </>
+        )}
+      </span>
+    </div>
+  );
+}
+
+/** Single account-page row that links to the printer settings page. */
+export function PrinterRow({ href = "/akun/printer" }: { href?: string }) {
+  const snapshot = usePrinter();
+  const info = describe(snapshot);
+
+  return (
+    <Link
+      href={href}
+      aria-label={info.aria}
+      className="flex min-h-[68px] items-center gap-3 rounded-2xl border border-slate-200 bg-white px-[14px] py-3 transition-colors hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+    >
+      <PrinterStatusView size="md" className="flex-1" />
+      <ChevronRight className="h-[18px] w-[18px] shrink-0 text-slate-400" strokeWidth={2} />
+    </Link>
+  );
+}
+
+/** Compact, tappable status used in the nota print bar. */
+export function PrinterStatus({ setupHref = "/akun/printer" }: { setupHref?: string }) {
   const router = useRouter();
-  const { supported, status, name, connect } = usePrinter();
+  const { supported, status, connect } = usePrinter();
 
   if (!supported) return null;
 
   const isSetup = status === "belum diatur";
   const isDisconnected = status === "terputus";
-  const dotColor = isSetup ? null : DOT_COLORS[status];
-  const label = isSetup ? "Printer belum diatur" : TEXT_LABELS[status];
 
   const onTap = isDisconnected
     ? () => {
         void connect();
       }
     : isSetup
-      ? () => router.push(accountHref)
+      ? () => router.push(setupHref)
       : undefined;
 
-  const content = (
-    <>
-      <span
-        className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px]"
-        style={{ backgroundColor: "#F1F5F9" }}
-      >
-        <Printer className="h-[18px] w-[18px] text-slate-700" strokeWidth={2} />
-        {dotColor ? (
-          <span
-            className={`absolute bottom-0 right-0 h-[10px] w-[10px] rounded-full border-2 border-white ${
-              status === "menyambungkan" ? "animate-pulse" : ""
-            }`}
-            style={{ backgroundColor: dotColor }}
-          />
-        ) : null}
-      </span>
-      <span className="flex min-w-0 flex-col">
-        {name ? (
-          <span className="truncate text-[13px] font-semibold text-slate-900">{name}</span>
-        ) : null}
-        <span className="text-[12px] font-medium" style={{ color: TEXT_COLORS[status] }}>
-          {label}
-        </span>
-      </span>
-    </>
-  );
+  if (onTap) {
+    return (
+      <button type="button" onClick={onTap} className="block w-full min-w-0 text-left">
+        <PrinterStatusView size="sm" />
+      </button>
+    );
+  }
 
-  return (
-    <div role="status" aria-live="polite" className="min-w-0">
-      {onTap ? (
-        <button
-          type="button"
-          onClick={onTap}
-          className="flex w-full min-w-0 items-center gap-2.5 text-left"
-        >
-          {content}
-        </button>
-      ) : (
-        <div className="flex min-w-0 items-center gap-2.5">{content}</div>
-      )}
-    </div>
-  );
+  return <PrinterStatusView size="sm" />;
 }

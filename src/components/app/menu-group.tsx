@@ -2,14 +2,12 @@ import Link from "next/link";
 import { ChevronRight, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { SectionHeading } from "./section-heading";
+
 export function MenuGroup({ title, children }: { title?: string; children: ReactNode }) {
   return (
     <section>
-      {title ? (
-        <h2 className="mx-1 mb-2 text-xs font-semibold uppercase tracking-[0.06em] text-slate-500">
-          {title}
-        </h2>
-      ) : null}
+      {title ? <SectionHeading>{title}</SectionHeading> : null}
       <div className="divide-y divide-slate-200 overflow-hidden rounded-2xl border border-slate-200 bg-white">
         {children}
       </div>

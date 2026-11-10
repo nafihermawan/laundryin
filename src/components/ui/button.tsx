@@ -1,7 +1,7 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { Loader2 } from "lucide-react";
 
-type ButtonVariant = "primary" | "outline";
+type ButtonVariant = "primary" | "outline" | "danger" | "danger-outline";
 type ButtonSize = "lg" | "md";
 
 export function buttonClass(opts?: {
@@ -22,6 +22,8 @@ export function buttonClass(opts?: {
   const variants: Record<ButtonVariant, string> = {
     primary: "bg-indigo-600 text-white hover:bg-indigo-700",
     outline: "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
+    danger: "bg-red-600 text-white hover:bg-red-700",
+    "danger-outline": "border border-slate-200 bg-white text-red-700 hover:bg-red-50",
   };
 
   return `${base} ${sizes[size]} ${variants[variant]} ${opts?.fullWidth ? "w-full" : ""} ${opts?.className ?? ""}`;

@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Info, KeyRound, UserCog } from "lucide-react";
+import { KeyRound, LogOut, UserCog } from "lucide-react";
 
 import { MenuGroup, MenuRow } from "@/components/app/menu-group";
-import { PrinterSettings } from "@/components/app/printer-settings";
+import { PrinterRow } from "@/components/app/printer-status";
+import { SectionHeading } from "@/components/app/section-heading";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
@@ -12,12 +13,10 @@ export function AccountScreen({
   name,
   email,
   role,
-  version,
 }: {
   name: string;
   email: string;
   role: "admin" | "cashier";
-  version: string;
 }) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -46,18 +45,18 @@ export function AccountScreen({
         <MenuRow title="Ganti kata sandi" icon={KeyRound} iconBox={false} />
       </MenuGroup>
 
-      <MenuGroup title="Aplikasi">
-        <MenuRow
-          title="Tentang laundry.in"
-          icon={Info}
-          iconBox={false}
-          trailing={<span className="text-[13px] text-slate-500">v{version}</span>}
-        />
-      </MenuGroup>
+      <section>
+        <SectionHeading>Printer</SectionHeading>
+        <PrinterRow />
+      </section>
 
-      <PrinterSettings />
-
-      <Button variant="outline" size="lg" fullWidth onClick={() => setConfirmOpen(true)}>
+      <Button
+        variant="danger-outline"
+        size="lg"
+        fullWidth
+        onClick={() => setConfirmOpen(true)}
+      >
+        <LogOut className="h-5 w-5" strokeWidth={2} />
         Keluar dari akun
       </Button>
 
