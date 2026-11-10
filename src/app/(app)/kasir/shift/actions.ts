@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { getShiftCashTotal } from "@/lib/auth/cash-register";
 import { revalidatePath } from "next/cache";
 import { ActionResponse, success, error as actionError } from "@/lib/action-response";
 
@@ -34,6 +35,7 @@ export async function openShift(startingCash: number): Promise<ActionResponse> {
   if (error) return actionError(error.message);
 
   revalidatePath("/kasir");
+  revalidatePath("/kasir/shift");
   return success(undefined);
 }
 
@@ -59,18 +61,11 @@ export async function closeShift(registerId: string, actualCash: number, notes?:
     return actionError("Shift kasir tidak ditemukan atau sudah ditutup");
   }
 
-  // 2. Hitung total cash dari tabel payments untuk shift ini
-  const { data: payments, error: payError } = await supabase
-    .from("payments")
-    .select("amount")
-    .eq("cash_register_id", registerId)
-    .eq("method", "cash")
-    .eq("status", "paid");
-
-  if (payError) return actionError(payError.message);
+  // 2. Hitung total cash dari tabel payments untuk shift ini.
+  //    getShiftCashTotal is the same source/filter the Beranda "Tunai" figure uses.
+  const totalCashPayments = await getShiftCashTotal(supabase, registerId);
 
   const starting = register?.starting_cash ?? 0;
-  const totalCashPayments = (payments ?? []).reduce((sum, p) => sum + Number(p.amount), 0);
   const expectedCash = Number(starting) + totalCashPayments;
   const variance = actualCash - expectedCash;
 
@@ -90,5 +85,6 @@ export async function closeShift(registerId: string, actualCash: number, notes?:
   if (updateError) return actionError(updateError.message);
 
   revalidatePath("/kasir");
+  revalidatePath("/kasir/shift");
   return success(undefined);
 }

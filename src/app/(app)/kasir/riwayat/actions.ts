@@ -446,6 +446,10 @@ export async function payOrder(orderId: string, input: PayOrderInput): Promise<A
 
   if (error) return actionError(error.message);
 
+  // Refresh the cashier Beranda (shift "Tunai" total), the shift page and the
+  // history list so the new cash payment shows up immediately.
   revalidatePath("/kasir/riwayat");
+  revalidatePath("/kasir");
+  revalidatePath("/kasir/shift");
   return success(undefined);
 }

@@ -44,12 +44,18 @@ export function ServiceSelect({
   }, [open]);
 
   useEffect(() => {
+    // Only the currently-open instance may close on an outside mousedown.
+    // Without this guard every row's listener reacted to a click inside ANOTHER
+    // row's open dropdown (it looks "outside" to them), closing the shared
+    // open state on mousedown before the option click landed — so items 2+ never
+    // received their selection.
+    if (!open) return;
     function onDocMouseDown(e: MouseEvent) {
       if (rootRef.current && !rootRef.current.contains(e.target as Node)) onOpenChange(false);
     }
     document.addEventListener("mousedown", onDocMouseDown);
     return () => document.removeEventListener("mousedown", onDocMouseDown);
-  }, [onOpenChange]);
+  }, [open, onOpenChange]);
 
   return (
     <div

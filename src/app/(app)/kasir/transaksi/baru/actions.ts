@@ -66,21 +66,28 @@ export async function saveTransaction(
     return actionError("No. HP wajib diisi");
   }
 
-  // 1b. Cek apakah kasir sudah buka shift (hanya jika role bukan admin)
-  let shiftId: string | null = null;
-  if (role !== "admin") {
-    const { data: shift } = await supabase
-      .from("cash_registers")
-      .select("id")
-      .eq("user_id", user.id)
-      .eq("status", "open")
-      .maybeSingle();
+  // 1b. Resolve the current user's open shift. Every payment must carry the
+  // cash_register_id of the shift that took the money so the Beranda "Tunai"
+  // figure and the close-shift expected_cash can see it — for every role,
+  // including admin (admins used to bypass this and wrote NULL cash_register_id).
+  const { data: shift } = await supabase
+    .from("cash_registers")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("status", "open")
+    .maybeSingle();
 
-    shiftId = (shift as unknown as { id?: string } | null)?.id ?? null;
+  const shiftId = (shift as unknown as { id?: string } | null)?.id ?? null;
 
-    if (!shiftId) {
-      return actionError("Anda harus membuka shift kasir terlebih dahulu sebelum membuat transaksi");
-    }
+  // Non-admins cannot create an order without a shift; admins may record an
+  // unpaid order, but any payment they take must still be tied to a shift.
+  const willCreatePayment = !data.skipPayment;
+  if (!shiftId && (role !== "admin" || willCreatePayment)) {
+    return actionError(
+      role !== "admin"
+        ? "Anda harus membuka shift kasir terlebih dahulu sebelum membuat transaksi"
+        : "Anda harus membuka shift kasir terlebih dahulu sebelum menerima pembayaran",
+    );
   }
 
   let orderId: string | null = null;
@@ -201,6 +208,7 @@ export async function saveTransaction(
     if (data.skipPayment) {
       try {
         revalidatePath("/kasir/riwayat");
+        revalidatePath("/kasir");
       } catch {}
       return actionSuccess({ orderNo, orderId: createdOrderId });
     }
@@ -272,6 +280,7 @@ export async function saveTransaction(
 
       try {
         revalidatePath("/kasir/riwayat");
+        revalidatePath("/kasir");
       } catch {}
 
       return actionSuccess({
@@ -289,8 +298,9 @@ export async function saveTransaction(
 
     try {
       revalidatePath("/kasir/riwayat");
+      revalidatePath("/kasir");
     } catch {}
-    
+
     return actionSuccess({ orderNo, orderId: createdOrderId });
   } catch (err) {
     console.error("Save transaction error:", err);

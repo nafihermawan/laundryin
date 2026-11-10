@@ -470,15 +470,15 @@ begin
     raise exception 'Metode pembayaran tidak valid';
   end if;
 
-  if role <> 'admin' then
-    select cr.id into shift_id
-    from public.cash_registers cr
-    where cr.user_id = auth.uid() and cr.status = 'open'
-    limit 1;
+  -- Always resolve the receiving user's open shift (every role, including admin)
+  -- so the payment can be reconciled against the shift that actually took the cash.
+  select cr.id into shift_id
+  from public.cash_registers cr
+  where cr.user_id = auth.uid() and cr.status = 'open'
+  limit 1;
 
-    if shift_id is null then
-      raise exception 'Anda harus membuka shift kasir terlebih dahulu sebelum menerima pembayaran';
-    end if;
+  if shift_id is null then
+    raise exception 'Anda harus membuka shift kasir terlebih dahulu sebelum menerima pembayaran';
   end if;
 
   select o.received_at into received_at

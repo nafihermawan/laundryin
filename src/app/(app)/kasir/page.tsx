@@ -5,7 +5,7 @@ import { Briefcase, ChevronRight, History } from "lucide-react";
 import { HomeHeader } from "@/components/app/home-header";
 import { KasirBottomNav } from "@/components/app/kasir-bottom-nav";
 import { MenuGroup, MenuRow } from "@/components/app/menu-group";
-import { getActiveCashRegister } from "@/lib/auth/cash-register";
+import { getActiveCashRegister, getShiftCashTotal } from "@/lib/auth/cash-register";
 import { getSessionProfile } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 
@@ -45,13 +45,7 @@ export default async function KasirPage() {
 
   let cashTotal = 0;
   if (shiftStatus.isOpen && shiftStatus.registerId) {
-    const { data: payments } = await supabase
-      .from("payments")
-      .select("amount")
-      .eq("cash_register_id", shiftStatus.registerId)
-      .eq("method", "cash")
-      .eq("status", "paid");
-    cashTotal = (payments ?? []).reduce((sum, p) => sum + Number(p.amount), 0);
+    cashTotal = await getShiftCashTotal(supabase, shiftStatus.registerId);
   }
 
   const summary = [

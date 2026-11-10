@@ -66,8 +66,14 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 let itemSeq = 1;
+function makeItemId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `item-${itemSeq++}`;
+}
 function newItem(): ItemRow {
-  return { id: `item-${itemSeq++}`, serviceId: null, serviceName: "", unit: "kg", qty: 1, price: 0 };
+  return { id: makeItemId(), serviceId: null, serviceName: "", unit: "kg", qty: 1, price: 0 };
 }
 
 export function TransactionForm({ services }: { services: ServiceOption[] }) {
@@ -81,7 +87,7 @@ export function TransactionForm({ services }: { services: ServiceOption[] }) {
   const [phone, setPhone] = useState("");
   const [note, setNote] = useState("");
   const [showNote, setShowNote] = useState(false);
-  const [items, setItems] = useState<ItemRow[]>([newItem()]);
+  const [items, setItems] = useState<ItemRow[]>(() => [newItem()]);
   const [openSelectId, setOpenSelectId] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);

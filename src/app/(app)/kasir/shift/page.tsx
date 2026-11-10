@@ -1,6 +1,6 @@
 import { PageShell } from "@/components/app/page-shell";
 import { createClient } from "@/lib/supabase/server";
-import { getActiveCashRegister } from "@/lib/auth/cash-register";
+import { getActiveCashRegister, getShiftCashTotal } from "@/lib/auth/cash-register";
 import { getSessionProfile } from "@/lib/auth/session";
 import { redirect } from "next/navigation";
 import { ShiftForm } from "./shift-form";
@@ -21,14 +21,7 @@ export default async function ShiftPage() {
 
   let expectedCash = 0;
   if (shiftStatus.isOpen && shiftStatus.registerId) {
-    const { data: payments } = await supabase
-      .from("payments")
-      .select("amount")
-      .eq("cash_register_id", shiftStatus.registerId)
-      .eq("method", "cash")
-      .eq("status", "paid");
-
-    const totalCashPayments = (payments ?? []).reduce((sum, p) => sum + Number(p.amount), 0);
+    const totalCashPayments = await getShiftCashTotal(supabase, shiftStatus.registerId);
     expectedCash = Number(shiftStatus.startingCash) + totalCashPayments;
   }
 
