@@ -133,7 +133,7 @@ export default async function NotaPage({
         style={{ paddingBottom: "calc(112px + env(safe-area-inset-bottom))" }}
       >
       <div className="flex flex-col gap-6">
-      <div className="mx-auto w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm print:border-0 print:shadow-none">
+      <div className="card mx-auto w-full max-w-md p-6 print:border-0 print:shadow-none">
         <div className="flex flex-col items-center gap-1">
           <div className="text-base font-semibold tracking-tight">laundry.in</div>
           <div className="text-[12px] text-[#64748B]">Telp {STORE_PHONE}</div>

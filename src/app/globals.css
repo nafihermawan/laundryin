@@ -3,6 +3,11 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --card-border: #eef1f5;
+  --card-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.04),
+    0 2px 8px rgba(15, 23, 42, 0.06);
+  --border: #e2e8f0;
 }
 
 @theme inline {
@@ -18,6 +23,18 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans);
   -webkit-tap-highlight-color: transparent;
+}
+
+/* Top-level cards: white surface, hairline border, soft shadow.
+   Defined in the components layer so utilities (padding, overflow, print:*)
+   still win. Cards written by hand should use this class. */
+@layer components {
+  .card {
+    border: 1px solid var(--card-border);
+    border-radius: 16px;
+    background-color: #ffffff;
+    box-shadow: var(--card-shadow);
+  }
 }
 
 /* Keep focused fields / scrollIntoView clear of the sticky header. */

@@ -28,7 +28,7 @@ export default function Loading() {
           </div>
           <div>
             <Skeleton className="mx-1 mb-2 h-3 w-24" />
-            <div className="divide-y divide-slate-200 rounded-2xl border border-slate-200 bg-white">
+            <div className="divide-y divide-slate-200 card">
               {[0, 1, 2, 3].map((i) => (
                 <div key={i} className="flex flex-col gap-2 p-3.5">
                   <div className="flex items-center justify-between gap-3">

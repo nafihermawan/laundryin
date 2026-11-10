@@ -110,7 +110,7 @@ export function ServicesList({ initialServices }: { initialServices: ServiceRow[
       {isAdding || editingId ? (
         <form
           onSubmit={handleSubmit}
-          className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm"
+          className="card p-5"
         >
           <h3 className="mb-4 font-semibold">
             {editingId ? "Edit Layanan" : "Tambah Layanan Baru"}
@@ -172,7 +172,7 @@ export function ServicesList({ initialServices }: { initialServices: ServiceRow[
         </form>
       ) : null}
 
-      <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
+      <div className="card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-[640px] w-full text-left text-xs sm:text-sm">
             <thead>

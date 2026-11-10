@@ -93,7 +93,7 @@ export default async function EmbedNotaPage({
   const creatorName = creatorProfile?.full_name?.trim() || "User";
 
   return (
-    <div id="embed-root" className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+    <div id="embed-root" className="card p-6 print:border-0 print:shadow-none">
       <HeightSender />
         <div className="flex flex-col items-center gap-1 border-b border-zinc-100 pb-4">
           <div className="text-lg font-semibold tracking-tight text-zinc-900">laundry.in</div>

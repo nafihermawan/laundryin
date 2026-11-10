@@ -34,7 +34,7 @@ export default async function ShiftPage() {
             : "Masukkan modal awal (uang receh/kembalian) di laci kasir sebelum memulai transaksi."}
         </p>
 
-        <div className="mx-auto w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6">
+        <div className="card mx-auto w-full max-w-md p-6">
           <ShiftForm
             isOpen={shiftStatus.isOpen}
             registerId={shiftStatus.registerId}

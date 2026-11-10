@@ -51,7 +51,7 @@ export default async function LaporanKasirPage() {
 
   return (
     <PageShell title="Laporan Shift Kasir">
-      <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
+      <div className="card overflow-x-auto">
         <table className="w-full text-left text-sm text-slate-600">
           <thead className="border-b border-slate-200 bg-slate-50/50 text-slate-900">
             <tr>

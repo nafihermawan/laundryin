@@ -49,7 +49,7 @@ export function ScrollCue({
         className="pointer-events-none fixed inset-x-0 z-30 h-[110px] transition-opacity duration-200"
         style={{
           bottom: `calc(${barHeight}px + env(safe-area-inset-bottom))`,
-          background: "linear-gradient(to bottom, transparent, #F8FAFC 75%)",
+          background: "linear-gradient(to bottom, rgba(255,255,255,0), #FFFFFF 75%)",
           opacity: show ? 1 : 0,
         }}
       />

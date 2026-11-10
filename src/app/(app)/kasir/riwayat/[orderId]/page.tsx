@@ -178,7 +178,7 @@ export default async function TransactionDetailPage({
       <div className="flex min-h-full flex-1 flex-col">
         <PageHeader title="Detail Transaksi" fallbackHref="/kasir" />
         <main className="mx-auto w-full max-w-6xl flex-1 px-4 pt-4">
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
+          <div className="card p-4 text-sm text-slate-600">
             {error ? error.message : "Transaksi tidak ditemukan."}
           </div>
         </main>
@@ -289,9 +289,9 @@ export default async function TransactionDetailPage({
         className="mx-auto w-full max-w-6xl flex-1 px-4 pt-4"
         style={{ paddingBottom: "calc(112px + env(safe-area-inset-bottom))" }}
       >
-        <div className="flex flex-col gap-5">
+        <div className="flex flex-col gap-6">
           {/* Ringkasan */}
-          <section className="rounded-2xl border border-slate-200 bg-white p-4">
+          <section className="card p-4">
             <div className="flex flex-col gap-3.5">
               <div className="flex items-center gap-2">
                 <span className="flex-1 text-[13px] tabular-nums text-slate-500">{order.order_no}</span>
@@ -387,7 +387,7 @@ export default async function TransactionDetailPage({
 
           {/* Rincian layanan */}
           <Section title="Rincian layanan">
-            <div className="rounded-2xl border border-slate-200 bg-white px-4 pb-4 pt-1">
+            <div className="card px-4 pb-4 pt-1">
               <div className="divide-y divide-slate-200">
                 {items.map((it, idx) => {
                   const subtotal = Number(it.subtotal ?? (it.qty ?? 0) * (it.unit_price ?? 0));

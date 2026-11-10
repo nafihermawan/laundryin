@@ -19,6 +19,6 @@ export default async function AppLayout({
   }
 
   return (
-    <div className="flex min-h-full flex-1 flex-col bg-slate-50 text-slate-900">{children}</div>
+    <div className="flex min-h-full flex-1 flex-col bg-white text-slate-900">{children}</div>
   );
 }

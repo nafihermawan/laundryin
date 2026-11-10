@@ -35,7 +35,7 @@ export function StatusAccordion({
   }, []);
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+    <div className="card overflow-hidden">
       <button
         type="button"
         aria-expanded={open}

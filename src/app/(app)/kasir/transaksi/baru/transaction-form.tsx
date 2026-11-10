@@ -259,9 +259,9 @@ export function TransactionForm({ services }: { services: ServiceOption[] }) {
         className="mx-auto w-full max-w-6xl flex-1 px-4 pt-4"
         style={{ paddingBottom: "calc(112px + env(safe-area-inset-bottom))" }}
       >
-        <div className="flex flex-col gap-5">
+        <div className="flex flex-col gap-6">
           <Section title="Pelanggan">
-            <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4">
+            <div className="flex flex-col gap-4 card p-4">
               <Field label="Nama" htmlFor="custName" error={errors.name}>
                 <input
                   id="custName"
@@ -314,7 +314,7 @@ export function TransactionForm({ services }: { services: ServiceOption[] }) {
             <div ref={itemsRef} tabIndex={-1} className="flex flex-col gap-2 outline-none">
               <ol className="flex list-none flex-col gap-2">
                 {items.map((item) => (
-                  <li key={item.id} className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-3.5">
+                  <li key={item.id} className="flex flex-col gap-3 card p-3.5">
                     <div className="flex items-center gap-2">
                       <ServiceSelect
                         open={openSelectId === item.id}
@@ -374,7 +374,7 @@ export function TransactionForm({ services }: { services: ServiceOption[] }) {
           </Section>
 
           <Section title="Waktu">
-            <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4">
+            <div className="flex flex-col gap-4 card p-4">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-slate-500">Masuk</span>
                 <span className="text-sm font-semibold tabular-nums text-slate-900">{formatDisplay(receivedAt)}</span>

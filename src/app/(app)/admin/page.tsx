@@ -51,7 +51,7 @@ export default async function AdminPage() {
     <div className="flex min-h-full flex-1 flex-col">
       <HomeHeader name={displayName} />
 
-      <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 pb-[120px] pt-5">
+      <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-7 px-4 pb-[120px] pt-5">
         <div className="flex flex-col gap-1">
             <div className="flex items-center gap-2">
               <h1 className="font-display text-[18px] font-semibold tracking-[-0.01em] text-slate-900">
@@ -62,7 +62,7 @@ export default async function AdminPage() {
             <p className="text-sm text-slate-500">{todayLabel}</p>
           </div>
 
-          <section className="rounded-2xl border border-slate-200 bg-white p-4">
+          <section className="card p-4">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold text-slate-900">Ringkasan hari ini</h2>
               <span className="text-xs text-slate-500">Ketuk untuk detail</span>
@@ -91,7 +91,7 @@ export default async function AdminPage() {
             </div>
           </section>
 
-          <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-7">
             <MenuGroup title="Transaksi">
               <MenuRow
                 href="/admin/riwayat"

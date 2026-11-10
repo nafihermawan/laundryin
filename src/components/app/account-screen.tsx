@@ -25,7 +25,7 @@ export function AccountScreen({
 
   return (
     <div className="flex flex-col gap-6">
-      <section className="rounded-2xl border border-slate-200 bg-white p-4">
+      <section className="card p-4">
         <div className="flex items-center gap-3">
           <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-indigo-600 font-display text-[22px] font-bold text-white">
             {initial}

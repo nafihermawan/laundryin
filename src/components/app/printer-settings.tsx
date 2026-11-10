@@ -75,7 +75,7 @@ export function PrinterSettings() {
   }
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+    <div className="card overflow-hidden">
       {supported ? (
         <button
           type="button"

@@ -12,7 +12,7 @@ export default function Loading() {
             <Skeleton className="h-5 w-40" />
             <Skeleton className="h-4 w-56" />
           </div>
-          <div className="rounded-2xl border border-slate-200 bg-white p-4">
+          <div className="card p-4">
             <div className="flex items-center gap-3">
               <Skeleton className="h-11 w-11 rounded-xl" />
               <div className="flex flex-1 flex-col gap-2">
@@ -26,7 +26,7 @@ export default function Loading() {
               <Skeleton className="h-4 w-2/3" />
             </div>
           </div>
-          <div className="rounded-2xl border border-slate-200 bg-white p-4">
+          <div className="card p-4">
             <Skeleton className="h-4 w-32" />
             <div className="mt-3 grid grid-cols-3 gap-2">
               <Skeleton className="h-[88px] rounded-xl" />
@@ -36,7 +36,7 @@ export default function Loading() {
           </div>
           <div>
             <Skeleton className="mx-1 mb-2 h-3 w-16" />
-            <div className="divide-y divide-slate-200 rounded-2xl border border-slate-200 bg-white">
+            <div className="divide-y divide-slate-200 card">
               {[0, 1].map((r) => (
                 <div key={r} className="flex items-center gap-3 px-[14px] py-3">
                   <Skeleton className="h-10 w-10" />

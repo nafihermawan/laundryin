@@ -52,7 +52,7 @@ export function CreateUserForm() {
 
   return (
     <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
-      <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4">
+      <div className="card flex flex-col gap-4 p-4">
         <Field label="Nama lengkap" htmlFor="fullName" error={errors.fullName}>
           <input
             id="fullName"

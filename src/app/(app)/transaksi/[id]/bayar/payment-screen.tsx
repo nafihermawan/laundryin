@@ -269,8 +269,8 @@ export function PaymentScreen({
         className="mx-auto w-full max-w-6xl flex-1 px-4 pt-4"
         style={{ paddingBottom: "calc(112px + env(safe-area-inset-bottom))" }}
       >
-        <div className="flex flex-col gap-5">
-          <section className="flex flex-col gap-3.5 rounded-2xl border border-slate-200 bg-white p-4">
+        <div className="flex flex-col gap-6">
+          <section className="flex flex-col gap-3.5 card p-4">
             {isNew ? (
               <div role="status" className="flex items-center gap-2">
                 <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100">
@@ -348,7 +348,7 @@ export function PaymentScreen({
             style={{ gridTemplateRows: method === "cash" ? "1fr" : "0fr" }}
           >
             <div className="overflow-hidden">
-              <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+              <div className="flex flex-col gap-3 card p-4">
                 <label htmlFor="cashReceived" className="text-sm font-medium text-slate-900">
                   Uang diterima
                 </label>

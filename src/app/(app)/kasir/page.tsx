@@ -80,7 +80,7 @@ export default async function KasirPage() {
       <BukaShiftToast />
       <HomeHeader name={profile.name} homeHref="/kasir" accountHref="/kasir/akun" />
 
-      <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 pb-[120px] pt-5">
+      <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-7 px-4 pb-[120px] pt-5">
         <h1 className="sr-only">Beranda</h1>
 
         <ShiftCard
@@ -93,7 +93,7 @@ export default async function KasirPage() {
           cashTotal={cashTotal}
         />
 
-        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+        <section className="card overflow-hidden">
           <h2 className="border-b border-slate-200 px-[14px] py-3 text-[13px] font-semibold text-slate-900">
             Ringkasan hari ini
           </h2>

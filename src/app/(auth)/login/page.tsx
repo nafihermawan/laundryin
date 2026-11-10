@@ -15,7 +15,7 @@ export default async function LoginPage() {
 
   return (
     <div
-      className="flex min-h-[100dvh] flex-col bg-[#F8FAFC]"
+      className="flex min-h-[100dvh] flex-col bg-white"
       style={{ paddingTop: "calc(88px + env(safe-area-inset-top))" }}
     >
       <div className="mx-auto flex w-full max-w-[400px] flex-1 flex-col gap-8 px-6">

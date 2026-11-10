@@ -6,7 +6,7 @@ export default function Loading() {
     <div className="flex min-h-full flex-1 flex-col">
       <PageHeader title="Nota" fallbackHref="/kasir/riwayat" />
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 pt-5" style={{ paddingBottom: "calc(96px + env(safe-area-inset-bottom))" }}>
-        <div className="mx-auto w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+        <div className="card mx-auto w-full max-w-md p-6">
           <div className="flex flex-col items-center gap-2">
             <Skeleton className="h-5 w-24" />
             <Skeleton className="h-3 w-20" />

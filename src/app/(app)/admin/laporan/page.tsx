@@ -147,19 +147,19 @@ export default async function AdminLaporanPage({
         </div>
 
         <div className="grid gap-3 sm:grid-cols-3">
-          <div className="rounded-2xl border border-slate-200 bg-white p-4">
+          <div className="card p-4">
             <div className="text-xs font-medium text-slate-500">Total Omzet</div>
             <div className="mt-1 font-display text-xl font-bold tracking-tight text-slate-900">
               {formatIDR(totalOmzet)}
             </div>
           </div>
-          <div className="rounded-2xl border border-slate-200 bg-white p-4">
+          <div className="card p-4">
             <div className="text-xs font-medium text-slate-500">Rata-rata / Hari</div>
             <div className="mt-1 font-display text-xl font-bold tracking-tight text-slate-900">
               {formatIDR(avgOmzet)}
             </div>
           </div>
-          <div className="rounded-2xl border border-slate-200 bg-white p-4">
+          <div className="card p-4">
             <div className="text-xs font-medium text-slate-500">Transaksi</div>
             <div className="mt-1 font-display text-xl font-bold tracking-tight text-slate-900">
               {totalCount}
@@ -167,7 +167,7 @@ export default async function AdminLaporanPage({
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+        <div className="card overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
@@ -202,7 +202,7 @@ export default async function AdminLaporanPage({
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+        <div className="card overflow-hidden">
           <div className="border-b border-slate-100 bg-white px-4 py-3">
             <h2 className="text-base font-semibold tracking-tight text-slate-900">Detail Transaksi</h2>
           </div>

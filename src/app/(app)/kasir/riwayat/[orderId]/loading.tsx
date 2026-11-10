@@ -6,8 +6,8 @@ export default function Loading() {
     <div className="flex min-h-full flex-1 flex-col">
       <PageHeader title="Detail Transaksi" fallbackHref="/kasir/riwayat" />
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 pt-4" style={{ paddingBottom: "calc(112px + env(safe-area-inset-bottom))" }}>
-        <div className="flex flex-col gap-5">
-          <div className="rounded-2xl border border-slate-200 bg-white p-4">
+        <div className="flex flex-col gap-6">
+          <div className="card p-4">
             <div className="flex items-center justify-between gap-2">
               <Skeleton className="h-4 w-36" />
               <Skeleton className="h-9 w-9" />
@@ -38,7 +38,7 @@ export default function Loading() {
 
           <div>
             <Skeleton className="mx-1 mb-2 h-3 w-28" />
-            <div className="rounded-2xl border border-slate-200 bg-white px-4 pb-4 pt-1">
+            <div className="card px-4 pb-4 pt-1">
               {[0, 1].map((i) => (
                 <div key={i} className="flex items-center justify-between gap-3 border-b border-slate-200 py-3 last:border-0">
                   <div className="flex flex-1 flex-col gap-2">

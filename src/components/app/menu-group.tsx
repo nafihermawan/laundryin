@@ -8,7 +8,7 @@ export function MenuGroup({ title, children }: { title?: string; children: React
   return (
     <section>
       {title ? <SectionHeading>{title}</SectionHeading> : null}
-      <div className="divide-y divide-slate-200 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+      <div className="card divide-y divide-slate-200 overflow-hidden">
         {children}
       </div>
     </section>

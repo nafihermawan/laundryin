@@ -118,7 +118,7 @@ function TransactionRowItem({ t, href }: { t: Transaction; href: string }) {
 
 function ListSkeleton() {
   return (
-    <div className="divide-y divide-slate-200 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+    <div className="card divide-y divide-slate-200 overflow-hidden">
       {[0, 1, 2].map((i) => (
         <div key={i} className="flex flex-col gap-2 p-3.5">
           <div className="flex items-center justify-between gap-3">
@@ -350,11 +350,11 @@ export function TransactionList({
         {isPending || refreshing ? (
           <ListSkeleton />
         ) : isEmptyAll ? (
-          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-16 text-center text-[15px] text-slate-500">
+          <div className="card px-4 py-16 text-center text-[15px] text-slate-500">
             Belum ada transaksi
           </div>
         ) : noMatch ? (
-          <div className="flex flex-col items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-16 text-center">
+          <div className="flex flex-col items-center gap-3 card px-4 py-16 text-center">
             <p className="text-[15px] text-slate-500">Tidak ada transaksi yang cocok</p>
             <button
               type="button"
@@ -371,7 +371,7 @@ export function TransactionList({
                 <h2 className="mx-1 mb-2 text-xs font-semibold uppercase tracking-[0.06em] text-slate-500">
                   {group.label}
                 </h2>
-                <div className="divide-y divide-slate-200 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                <div className="card divide-y divide-slate-200 overflow-hidden">
                   {group.items.map((t) => (
                     <TransactionRowItem
                       key={t.id || t.order_no}
@@ -391,7 +391,7 @@ export function TransactionList({
         <div
           aria-hidden="true"
           className="pointer-events-none fixed inset-x-0 bottom-0 z-30 h-[120px]"
-          style={{ background: "linear-gradient(to bottom, transparent, #F8FAFC 75%)" }}
+          style={{ background: "linear-gradient(to bottom, rgba(255,255,255,0), #FFFFFF 75%)" }}
         />
       ) : null}
 

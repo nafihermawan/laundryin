@@ -103,7 +103,7 @@ export function PenggunaList({
 
   if (users.length === 0) {
     return (
-      <div className="flex flex-col items-center gap-4 rounded-2xl border border-slate-200 bg-white px-4 py-12 text-center">
+      <div className="flex flex-col items-center gap-4 card px-4 py-12 text-center">
         <p className="text-[15px] text-slate-500">Belum ada akun kasir</p>
         <Link href="/admin/pengguna/baru" className={buttonClass({ variant: "outline", size: "lg" })}>
           Tambah kasir
@@ -150,7 +150,7 @@ export function PenggunaList({
       </div>
 
       {filtered.length === 0 ? (
-        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-12 text-center text-[15px] text-slate-500">
+        <div className="card px-4 py-12 text-center text-[15px] text-slate-500">
           Tidak ada pengguna yang cocok
         </div>
       ) : (
