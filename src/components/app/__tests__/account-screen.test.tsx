@@ -40,11 +40,11 @@ describe("AccountScreen", () => {
     h.state = { supported: true, status: "terhubung", name: "RPP210A", paper: "58" };
   });
 
-  it("links the printer row to /akun/printer and drops the Aplikasi section", () => {
+  it("shows a collapsed printer section and drops the Aplikasi section", () => {
     render(<AccountScreen name="Renita" email="renita@laundry.local" role="admin" />);
 
-    const printerLink = screen.getByRole("link", { name: /Pengaturan printer, RPP210A terhubung/ });
-    expect(printerLink).toHaveAttribute("href", "/akun/printer");
+    const summary = screen.getByRole("button", { name: /RPP210A/ });
+    expect(summary).toHaveAttribute("aria-expanded", "false");
     expect(screen.getByText("Terhubung · 58 mm")).toBeInTheDocument();
 
     expect(screen.queryByText(/Tentang laundry\.in/i)).not.toBeInTheDocument();
@@ -53,11 +53,13 @@ describe("AccountScreen", () => {
     expect(screen.getByRole("button", { name: /Keluar dari akun/ })).toBeInTheDocument();
   });
 
-  it("shows the empty-state hint before a printer is chosen", () => {
+  it("opens by default when no printer has been chosen yet", () => {
     h.state = { supported: true, status: "belum diatur", name: null, paper: "58" };
     render(<AccountScreen name="Renita" email="renita@laundry.local" role="cashier" />);
 
-    expect(screen.getByText("Printer belum diatur")).toBeInTheDocument();
-    expect(screen.getByText("Ketuk untuk memilih printer")).toBeInTheDocument();
+    const summary = screen.getByRole("button", { name: /Printer belum diatur/ });
+    expect(summary).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("Ketuk untuk mengatur")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Pilih printer" })).toBeInTheDocument();
   });
 });

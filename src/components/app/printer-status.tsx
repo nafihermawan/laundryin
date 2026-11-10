@@ -1,8 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronRight, Printer } from "lucide-react";
+import { Printer } from "lucide-react";
 
 import { usePrinter } from "@/lib/printing/printer-provider";
 import type { PrinterStatus as PrinterStatusValue } from "@/lib/printing/printer-machine";
@@ -59,7 +58,6 @@ type Description = {
   dot: string | null;
   pulsing: boolean;
   textClass: string;
-  aria: string;
 };
 
 function describe(snapshot: {
@@ -76,7 +74,6 @@ function describe(snapshot: {
       dot: null,
       pulsing: false,
       textClass: "text-slate-500",
-      aria: "Pengaturan printer, cetak Bluetooth hanya di Chrome Android",
     };
   }
 
@@ -84,11 +81,10 @@ function describe(snapshot: {
     return {
       unsupported: false,
       name: "Printer belum diatur",
-      detail: "Ketuk untuk memilih printer",
+      detail: "Ketuk untuk mengatur",
       dot: null,
       pulsing: false,
       textClass: "text-slate-500",
-      aria: "Pengaturan printer, printer belum diatur",
     };
   }
 
@@ -107,9 +103,6 @@ function describe(snapshot: {
     dot: DOT_CLASS[status],
     pulsing: status === "menyambungkan",
     textClass: TEXT_CLASS[status],
-    aria: `Pengaturan printer, ${printerName} ${
-      status === "terhubung" ? "terhubung" : status === "menyambungkan" ? "menyambungkan" : "terputus"
-    }`,
   };
 }
 
@@ -155,25 +148,8 @@ export function PrinterStatusView({
   );
 }
 
-/** Single account-page row that links to the printer settings page. */
-export function PrinterRow({ href = "/akun/printer" }: { href?: string }) {
-  const snapshot = usePrinter();
-  const info = describe(snapshot);
-
-  return (
-    <Link
-      href={href}
-      aria-label={info.aria}
-      className="flex min-h-[68px] items-center gap-3 rounded-2xl border border-slate-200 bg-white px-[14px] py-3 transition-colors hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
-    >
-      <PrinterStatusView size="md" className="flex-1" />
-      <ChevronRight className="h-[18px] w-[18px] shrink-0 text-slate-400" strokeWidth={2} />
-    </Link>
-  );
-}
-
 /** Compact, tappable status used in the nota print bar. */
-export function PrinterStatus({ setupHref = "/akun/printer" }: { setupHref?: string }) {
+export function PrinterStatus({ setupHref = "/kasir/akun" }: { setupHref?: string }) {
   const router = useRouter();
   const { supported, status, connect } = usePrinter();
 

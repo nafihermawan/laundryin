@@ -4,7 +4,7 @@ import { useState } from "react";
 import { KeyRound, LogOut, UserCog } from "lucide-react";
 
 import { MenuGroup, MenuRow } from "@/components/app/menu-group";
-import { PrinterRow } from "@/components/app/printer-status";
+import { PrinterSettings } from "@/components/app/printer-settings";
 import { SectionHeading } from "@/components/app/section-heading";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -47,7 +47,7 @@ export function AccountScreen({
 
       <section>
         <SectionHeading>Printer</SectionHeading>
-        <PrinterRow />
+        <PrinterSettings />
       </section>
 
       <Button

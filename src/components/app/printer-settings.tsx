@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
+import { ChevronDown } from "lucide-react";
 
 import { PrinterStatusView } from "@/components/app/printer-status";
-import { SectionHeading } from "@/components/app/section-heading";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 import { buildReceiptEscPos, type ReceiptModel } from "@/lib/printing/escpos";
@@ -11,6 +11,7 @@ import { columnsForPaper, type PaperWidth } from "@/lib/printing/paper";
 import { usePrinter } from "@/lib/printing/printer-provider";
 
 const PAPER_OPTIONS: PaperWidth[] = ["58", "80"];
+const ACTION_RADIUS: CSSProperties = { borderRadius: 10 };
 
 function buildTestReceipt(): ReceiptModel {
   return {
@@ -29,9 +30,31 @@ export function PrinterSettings() {
   const { supported, status, name, paper, connect, ensureConnected, forget, setPaper, send } =
     usePrinter();
 
+  // Default closed, except when there is no printer yet — then open so the
+  // "Pilih printer" action is immediately visible. Once the user toggles, their
+  // choice wins.
+  const [toggled, setToggled] = useState(false);
+  const [open, setOpen] = useState(false);
   const [confirmForget, setConfirmForget] = useState(false);
+  const [reducedMotion, setReducedMotion] = useState(false);
+
+  const isSetup = status === "belum diatur";
+  const expanded = toggled ? open : isSetup;
   const configured = Boolean(name);
   const busy = status === "menyambungkan";
+
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const update = () => setReducedMotion(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+
+  function toggle() {
+    setToggled(true);
+    setOpen((o) => !o);
+  }
 
   async function handleTestPrint() {
     const ready = (await ensureConnected()) || (await connect());
@@ -52,67 +75,110 @@ export function PrinterSettings() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <section className="rounded-2xl border border-slate-200 bg-white p-4">
-        <PrinterStatusView size="lg" />
-      </section>
+    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+      {supported ? (
+        <button
+          type="button"
+          aria-expanded={expanded}
+          onClick={toggle}
+          className="flex min-h-[68px] w-full items-center gap-3 px-[14px] py-3 text-left"
+        >
+          <PrinterStatusView size="md" className="flex-1" />
+          <ChevronDown
+            className={`h-5 w-5 shrink-0 text-slate-500 transition-transform duration-200 ${
+              expanded ? "rotate-180" : ""
+            }`}
+            strokeWidth={2}
+          />
+        </button>
+      ) : (
+        <div className="flex min-h-[68px] items-center gap-3 px-[14px] py-3">
+          <PrinterStatusView size="md" className="flex-1" />
+        </div>
+      )}
 
       {supported ? (
-        <>
-          {configured ? (
-            <div className="grid grid-cols-2 gap-2">
-              <Button variant="outline" onClick={handleTestPrint} disabled={busy}>
-                Cetak tes
-              </Button>
-              <Button
-                variant="outline"
-                onClick={connect}
-                loading={busy}
-                loadingText="Menyambungkan…"
-              >
-                Ganti printer
-              </Button>
-            </div>
-          ) : (
-            <Button fullWidth onClick={connect} loading={busy} loadingText="Menyambungkan…">
-              Pilih printer
-            </Button>
-          )}
-
-          <section>
-            <SectionHeading>Ukuran kertas</SectionHeading>
-            <div className="flex gap-2">
-              {PAPER_OPTIONS.map((value) => {
-                const active = paper === value;
-                return (
-                  <button
-                    key={value}
-                    type="button"
-                    aria-pressed={active}
-                    onClick={() => setPaper(value)}
-                    className={`min-h-11 flex-1 rounded-[10px] text-sm ${
-                      active
-                        ? "border border-indigo-600 bg-indigo-50 font-semibold text-indigo-600"
-                        : "border border-slate-200 bg-white font-medium text-slate-600"
-                    }`}
+        <div
+          className="grid"
+          inert={expanded ? undefined : true}
+          style={{
+            gridTemplateRows: expanded ? "1fr" : "0fr",
+            transition: reducedMotion ? "none" : "grid-template-rows 200ms ease",
+          }}
+        >
+          <div className="overflow-hidden">
+            <div className="flex flex-col gap-4 border-t border-slate-200 px-[14px] pt-4 pb-2">
+              {configured ? (
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    variant="outline"
+                    className="min-h-11"
+                    style={ACTION_RADIUS}
+                    onClick={handleTestPrint}
+                    disabled={busy}
                   >
-                    {value} mm
-                  </button>
-                );
-              })}
-            </div>
-          </section>
+                    Cetak tes
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="min-h-11"
+                    style={ACTION_RADIUS}
+                    onClick={connect}
+                    loading={busy}
+                    loadingText="Menyambungkan…"
+                  >
+                    Ganti printer
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  className="min-h-11"
+                  style={ACTION_RADIUS}
+                  fullWidth
+                  onClick={connect}
+                  loading={busy}
+                  loadingText="Menyambungkan…"
+                >
+                  Pilih printer
+                </Button>
+              )}
 
-          {configured ? (
-            <button
-              type="button"
-              onClick={() => setConfirmForget(true)}
-              className="self-center py-2 text-sm font-semibold text-red-700"
-            >
-              Lupakan printer
-            </button>
-          ) : null}
-        </>
+              <div>
+                <div className="text-sm font-medium text-slate-900">Ukuran kertas</div>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  {PAPER_OPTIONS.map((value) => {
+                    const active = paper === value;
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        aria-pressed={active}
+                        onClick={() => setPaper(value)}
+                        className={`min-h-11 rounded-[10px] text-sm ${
+                          active
+                            ? "border border-indigo-600 bg-indigo-50 font-semibold text-indigo-600"
+                            : "border border-slate-200 bg-white font-medium text-slate-600"
+                        }`}
+                      >
+                        {value} mm
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {configured ? (
+                <button
+                  type="button"
+                  onClick={() => setConfirmForget(true)}
+                  className="mx-auto flex min-h-11 items-center px-2 text-sm font-medium text-red-700"
+                >
+                  Lupakan printer
+                </button>
+              ) : null}
+            </div>
+          </div>
+        </div>
       ) : null}
 
       {confirmForget ? (
